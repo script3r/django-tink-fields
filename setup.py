@@ -6,10 +6,9 @@ long_description = open("README.md").read() + open("CHANGES.md").read()
 
 
 def get_version():
-    with open(join("tink_fields", "__init__.py")) as f:
+    with open("VERSION", "r") as f:
         for line in f:
-            if line.startswith("__version__ ="):
-                return line.split("=")[1].strip().strip("\"'")
+            return line.strip()
 
 
 setup(
