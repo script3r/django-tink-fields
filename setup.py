@@ -16,7 +16,7 @@ setup(
     version=get_version(),
     description="Tink-based encrypted model fields for Django",
     long_description=long_description,
-    long_description_content_type="text/x-markdown",
+    long_description_content_type="text/markdown",
     author="Isaac Elbaz",
     author_email="script3r@gmail.com",
     url="https://github.com/script3r/django-tink-fields/",
