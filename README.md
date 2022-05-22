@@ -70,7 +70,7 @@ Other field types include: `EncryptedCharField`, `EncryptedTextField`, `Encrypte
 
 ### Associated Data
 
-The encrypted fields make use of `Authenticated Encryption With Associated Data (AEAD)` which offers confidentiality and integrity within the operation. This allows the caller to specify a cleartext fragment named `associated adata (aad)` to the encryptiona and decryption operation, and receive guarantees that the associated data has not been tampered with.
+The encrypted fields make use of `Authenticated Encryption With Associated Data (AEAD)` which offers confidentiality and integrity within the operation. This allows the caller to specify a cleartext fragment named `additional authenticated data (aad)` to the encryptiona and decryption operation, and receive guarantees that the associated data has not been tampered with.
 
 To specify the `aad`, provide a callback function `aad_callback` in the keyword arguments:
 
