@@ -7,7 +7,7 @@ long_description = open("README.md").read() + open("CHANGES.md").read()
 
 setup(
     name="django-tink-fields",
-    version="0.0.1",
+    version="0.1.0",
     description="Tink-based encrypted model fields for Django",
     long_description=long_description,
     long_description_content_type="text/markdown",
