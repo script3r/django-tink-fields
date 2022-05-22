@@ -5,15 +5,9 @@ from setuptools import setup, find_packages
 long_description = open("README.md").read() + open("CHANGES.md").read()
 
 
-def get_version():
-    with open("VERSION", "r") as f:
-        for line in f:
-            return line.strip()
-
-
 setup(
     name="django-tink-fields",
-    version=get_version(),
+    version="0.0.1",
     description="Tink-based encrypted model fields for Django",
     long_description=long_description,
     long_description_content_type="text/markdown",
