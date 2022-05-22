@@ -1,4 +1,4 @@
-from functools import cached_property, lru_cache
+from functools import lru_cache
 from typing import Any, Callable, Dict
 from django.db import models
 from django.core.exceptions import FieldError, ImproperlyConfigured
@@ -115,7 +115,8 @@ class EncryptedField(models.Field):
                 )
             )
 
-    @cached_property
+    @property
+    @lru_cache(maxsize=None)
     def validators(self):
         # Temporarily pretend to be whatever type of field we're masquerading
         # as, for purposes of constructing validators (needed for
