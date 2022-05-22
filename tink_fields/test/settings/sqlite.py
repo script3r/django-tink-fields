@@ -20,10 +20,10 @@ DATABASES = {
 TINK_FIELDS_CONFIG = {
     "default": {
         "cleartext": True,
-        "path": "/Users/script3r/Projects/django-tink-fields/tink_fields/test/test_plaintext_keyset.json",
+        "path": os.path.join(HERE, "../test_plaintext_keyset.json"),
     },
     "alternate": {
         "cleartext": True,
-        "path": "/Users/script3r/Projects/django-tink-fields/tink_fields/test/test_plaintext_keyset.json",
+        "path": os.path.join(HERE, "../test_plaintext_keyset.json"),
     },
 }
