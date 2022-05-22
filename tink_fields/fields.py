@@ -1,4 +1,4 @@
-from functools import cache, cached_property
+from functools import cached_property, lru_cache
 from typing import Any, Callable, Dict
 from django.db import models
 from django.core.exceptions import FieldError, ImproperlyConfigured
@@ -89,7 +89,7 @@ class EncryptedField(models.Field):
                 return cleartext_keyset_handle.read(reader)
             return read_keyset_handle(reader)
 
-    @cache
+    @lru_cache(maxsize=None)
     def _get_aead_primitive(self) -> aead.Aead:
         return self._keyset_handle.primitive(aead.Aead)
 
