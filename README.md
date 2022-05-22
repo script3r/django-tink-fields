@@ -8,7 +8,7 @@ Leverages [Google Tink](https://developers.google.com/tink) to encrypt Django's 
 Use `pip` to install `django-tink-fields`:
 
 ```bash
-  pip install django-tink-fields
+pip install django-tink-fields
 ```
 
 Edit `settings.py` and introduce a configuration section for `TINK_FIELDS_CONFIG`:
@@ -26,7 +26,7 @@ TINK_FIELDS_CONFIG = {
 }
 ```
 
-Tink keysets can be created via `tinkey`, and may optionally be wrapped via a key-management system such as `AWS KMS` or `GCP KMS`.
+Tink keysets can be created via `tinkey` and may optionally be wrapped via a key-management system such as `AWS KMS` or `GCP KMS`.
 
 To create a cleartext keyset for testing purposes:
 
@@ -40,7 +40,7 @@ Alternatively, to create an encrypted keyset that is wrapped by `GCP KMS`, speci
 tinkey create-keyset --out-format json --out test_encrypted_keyset.json --key-template AES128_GCM --master-key-uri=gcp-kms://projects/foo1/locations/global/keyRings/foo2/cryptoKeys/foo3
 ```
 
-To learn more about `tinkey` [read the relevant documentation](https://github.com/google/tink/blob/master/docs/TINKEY.md)
+To learn more about `tinkey` [read the relevant documentation](https://github.com/google/tink/blob/master/docs/TINKEY.md).
 
 ## Examples
 
@@ -55,7 +55,7 @@ class SomeModel(models.Model):
 
 ```
 
-You may specify the keyset by specifying a `keyset` keyword argument:
+You may specify a specific keyset by providing a `keyset` keyword argument:
 
 ```python
 from django.db import models
@@ -66,13 +66,13 @@ class AnotherModel(models.Model):
 
 ```
 
-Other field types include: `EncryptedCharField`, `EncryptedTextField`, `EncryptedDateField`, `EncryptedDateTimeField`, `EncryptedEmailField`, and `EncryptedIntegerField`.
+Supported field types include: `EncryptedCharField`, `EncryptedTextField`, `EncryptedDateField`, `EncryptedDateTimeField`, `EncryptedEmailField`, and `EncryptedIntegerField`.
 
 ### Associated Data
 
-The encrypted fields make use of `Authenticated Encryption With Associated Data (AEAD)` which offers confidentiality and integrity within the operation. This allows the caller to specify a cleartext fragment named `additional authenticated data (aad)` to the encryptiona and decryption operation, and receive guarantees that the associated data has not been tampered with.
+The encrypted fields make use of `Authenticated Encryption With Associated Data (AEAD)` which offers confidentiality and integrity within the same mode of operation. This allows the caller to specify a cleartext fragment named `additional authenticated data (aad)` to the encryption and decryption operations and receive cryptographic guarantees that the ciphertext data has not been tampered with.
 
-To specify the `aad`, provide a callback function `aad_callback` in the keyword arguments:
+To specify the `aad` fragment, provide a callback function `aad_callback` in the keyword arguments:
 
 ```python
 from django.db import models
@@ -83,7 +83,7 @@ class AnotherModel(models.Model):
 
 ```
 
-The value passed to the callback is the instance of the model field, with a signature of `Callable[[models.Field], bytes]`.
+The value passed to the callback is the instance of the model field, with a signature of `Callable[[models.Field], bytes]`. As a reminder, the associated data is *not* encrypted so **do not store sensitive data in it**.
 
 ## Acknowledgements
 

@@ -1,9 +1,6 @@
-from os.path import join
 from setuptools import setup, find_packages
 
-
-long_description = open("README.md").read() + open("CHANGES.md").read()
-
+long_description = open("README.md").read()
 
 setup(
     name="django-tink-fields",
