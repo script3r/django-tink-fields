@@ -1,0 +1,5 @@
+
+[run]
+source = tink_fields
+omit = tink_fields/test/*
+branch = 1
