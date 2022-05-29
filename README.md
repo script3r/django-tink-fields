@@ -16,12 +16,8 @@ Edit `settings.py` and introduce a configuration section for `TINK_FIELDS_CONFIG
 ```python
 TINK_FIELDS_CONFIG = {
     "default": {
-        "cleartext": False,
-        "path": "/path/to/an/encryted_keyset.json",
-    },
-    "another": {
         "cleartext": True,
-        "path": "/path/to/a/cleartext_keyset.json",
+        "path": "/path/to/a/plaintext_keyset.json",
     }
 }
 ```
@@ -38,6 +34,31 @@ Alternatively, to create an encrypted keyset that is wrapped by `GCP KMS`, speci
 
 ```bash
 tinkey create-keyset --out-format json --out test_encrypted_keyset.json --key-template AES128_GCM --master-key-uri=gcp-kms://projects/foo1/locations/global/keyRings/foo2/cryptoKeys/foo3
+```
+
+If you specify an encrypted keyset, you must also specify an `AEAD` construct that can unwrapped the keyset:
+
+```python
+from tink.integration import gcpkms
+from tink import aead
+
+aead.register()
+
+TINK_MASTER_KEY_URI = os.getenv(
+    "TINK_MASTER_KEY_URI",
+    "gcp-kms://projects/some-project/locations/global/keyRings/some-keyring/cryptoKeys/some-key",
+)
+
+gcp_client = gcpkms.GcpKmsClient(TINK_MASTER_KEY_URI, "")
+gcp_aead = gcp_client.get_aead(TINK_MASTER_KEY_URI)
+
+TINK_FIELDS_CONFIG = {
+    "default": {
+        "cleartext": False,
+        "path": "/path/to/an/encrypted_jeyset.json",
+        "master_key_aead": gcp_aead,
+    }
+}
 ```
 
 To learn more about `tinkey` [read the relevant documentation](https://github.com/google/tink/blob/master/docs/TINKEY.md).
