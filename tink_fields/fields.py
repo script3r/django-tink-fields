@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional
 from django.db import models
 from django.core.exceptions import FieldError, ImproperlyConfigured
 from tink import (
@@ -30,6 +30,7 @@ __all__ = [
 @dataclass
 class KeysetConfig:
     path: str
+    master_key_aead: Optional[aead.Aead] = None
     cleartext: bool = False
 
     def validate(self):
@@ -38,7 +39,10 @@ class KeysetConfig:
 
         if not exists(self.path):
             raise ImproperlyConfigured(f"Keyset {self.path} does not exist")
-
+        
+        if not self.cleartext and self.master_key_aead is None:
+            raise ImproperlyConfigured(f"Encrypted keysets must specify `master_key_aead`")
+    
 
 class EncryptedField(models.Field):
     """A field that uses Tink primitives to protect the confidentiality and integrity of data"""
@@ -87,7 +91,7 @@ class EncryptedField(models.Field):
             reader = JsonKeysetReader(f.read())
             if keyset_config.cleartext:
                 return cleartext_keyset_handle.read(reader)
-            return read_keyset_handle(reader)
+            return read_keyset_handle(reader, keyset_config.master_key_aead)
 
     @lru_cache(maxsize=None)
     def _get_aead_primitive(self) -> aead.Aead:
