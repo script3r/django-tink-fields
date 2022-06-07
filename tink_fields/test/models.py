@@ -41,3 +41,15 @@ class EncryptedCharWithFixedAad(models.Model):
 
 class EncryptedCharWithAlternateKeyset(models.Model):
     value = fields.EncryptedCharField(max_length=25, keyset="alternate")
+
+
+class DeterministicEncryptedChar(models.Model):
+    value = fields.DeterministicEncryptedCharField(max_length=25, keyset="daead")
+
+
+class DeterministicEncryptedEmail(models.Model):
+    value = fields.DeterministicEncryptedEmailField(keyset="daead")
+
+
+class DeterministicEncryptedInt(models.Model):
+    value = fields.DeterministicEncryptedIntegerField(keyset="daead")

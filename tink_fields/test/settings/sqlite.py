@@ -26,4 +26,8 @@ TINK_FIELDS_CONFIG = {
         "cleartext": True,
         "path": os.path.join(HERE, "../test_plaintext_keyset.json"),
     },
+    "daead": {
+        "cleartext": True,
+        "path": os.path.join(HERE, "../test_plaintext_daead_keyset.json"),
+    },
 }
