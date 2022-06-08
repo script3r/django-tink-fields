@@ -27,6 +27,10 @@ class EncryptedDateTime(models.Model):
     value = fields.EncryptedDateTimeField()
 
 
+class EncryptedBinary(models.Model):
+    value = fields.EncryptedBinaryField()
+
+
 class EncryptedNullable(models.Model):
     value = fields.EncryptedIntegerField(null=True)
 
@@ -53,3 +57,7 @@ class DeterministicEncryptedEmail(models.Model):
 
 class DeterministicEncryptedInt(models.Model):
     value = fields.DeterministicEncryptedIntegerField(keyset="daead")
+
+
+class DeterministicEncryptedIntNullable(models.Model):
+    value = fields.DeterministicEncryptedIntegerField(keyset="daead", null=True)

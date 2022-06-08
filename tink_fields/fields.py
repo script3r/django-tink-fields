@@ -1,4 +1,4 @@
-from functools import lru_cache
+from django.utils.functional import cached_property
 from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 from django.db import models
 from django.core.exceptions import FieldError, ImproperlyConfigured
@@ -27,6 +27,7 @@ __all__ = [
     "EncryptedIntegerField",
     "EncryptedDateField",
     "EncryptedDateTimeField",
+    "EncryptedBinaryField",
     "DeterministicEncryptedField",
     "DeterministicEncryptedCharField",
     "DeterministicEncryptedEmailField",
@@ -103,8 +104,7 @@ class BaseEncryptedField(models.Field):
     def get_internal_type(self) -> str:
         return self._internal_type
 
-    @property
-    @lru_cache(maxsize=None)
+    @cached_property
     def validators(self):
         # Temporarily pretend to be whatever type of field we're masquerading
         # as, for purposes of constructing validators (needed for
@@ -117,19 +117,25 @@ class BaseEncryptedField(models.Field):
         finally:
             del self.__dict__["_internal_type"]
 
+    def to_python_prepare(self, value: bytes) -> Any:
+        if isinstance(self, models.BinaryField):
+            return value
+
+        return force_str(value)
+
 
 class EncryptedField(BaseEncryptedField):
     """A field that uses Tink primitives to protect the confidentiality and integrity of data"""
 
-    @lru_cache(maxsize=None)
-    def _get_aead_primitive(self) -> aead.Aead:
+    @cached_property
+    def _aead_primitive(self) -> aead.Aead:
         return self._keyset_handle.primitive(aead.Aead)
 
     def get_db_prep_save(self, value: Any, connection: "BaseDatabaseWrapper") -> Any:
         val = super(EncryptedField, self).get_db_prep_save(value, connection)
         if val is not None:
             return connection.Database.Binary(
-                self._get_aead_primitive().encrypt(
+                self._aead_primitive.encrypt(
                     force_bytes(val), self._aad_callback(self)
                 )
             )
@@ -137,8 +143,8 @@ class EncryptedField(BaseEncryptedField):
     def from_db_value(self, value, expression, connection, *args):
         if value is not None:
             return self.to_python(
-                force_str(
-                    self._get_aead_primitive().decrypt(
+                self.to_python_prepare(
+                    self._aead_primitive.decrypt(
                         bytes(value), self._aad_callback(self)
                     )
                 )
@@ -150,8 +156,8 @@ class DeterministicEncryptedField(BaseEncryptedField):
 
     _unsupported_properties = []
 
-    @lru_cache(maxsize=None)
-    def _get_daead_primitive(self) -> daead.DeterministicAead:
+    @cached_property
+    def _daead_primitive(self) -> daead.DeterministicAead:
         return self._keyset_handle.primitive(daead.DeterministicAead)
 
     def get_db_prep_value(
@@ -163,7 +169,7 @@ class DeterministicEncryptedField(BaseEncryptedField):
         )
         if val is not None:
             return connection.Database.Binary(
-                self._get_daead_primitive().encrypt_deterministically(
+                self._daead_primitive.encrypt_deterministically(
                     force_bytes(val), self._aad_callback(self)
                 )
             )
@@ -171,8 +177,8 @@ class DeterministicEncryptedField(BaseEncryptedField):
     def from_db_value(self, value, expression, connection, *args):
         if value is not None:
             return self.to_python(
-                force_str(
-                    self._get_daead_primitive().decrypt_deterministically(
+                self.to_python_prepare(
+                    self._daead_primitive.decrypt_deterministically(
                         bytes(value), self._aad_callback(self)
                     )
                 )
@@ -196,7 +202,7 @@ lookup_allowlist = {
 
 def is_lookup_allowed(cls, name) -> bool:
     for item in lookup_allowlist:
-        if item[1] == name and isinstance(cls, item[0]):
+        if item[1] == name and issubclass(cls, item[0]):
             return True
     return False
 
@@ -204,11 +210,11 @@ def is_lookup_allowed(cls, name) -> bool:
 # Override all lookups except in lookup_allowlist to get_prep_lookup
 for name, lookup in models.Field.class_lookups.items():
     for cls in (EncryptedField, DeterministicEncryptedField):
-        if not is_lookup_allowed(cls, name):
+        if is_lookup_allowed(cls, name):
             continue
 
         lookup_class = type(
-            cls.__name__ + name, (lookup,), {"get_prep_lookup": get_prep_lookup}
+            cls.__name__ + "__" + name, (lookup,), {"get_prep_lookup": get_prep_lookup}
         )
         cls.register_lookup(lookup_class)
 
@@ -235,6 +241,10 @@ class EncryptedDateField(EncryptedField, models.DateField):
 
 class EncryptedDateTimeField(EncryptedField, models.DateTimeField):
     pass
+
+
+class EncryptedBinaryField(EncryptedField, models.BinaryField):
+    """Encrypted raw binary data, must be under 2^32 bytes (4.295GB)"""
 
 
 class DeterministicEncryptedCharField(DeterministicEncryptedField, models.CharField):

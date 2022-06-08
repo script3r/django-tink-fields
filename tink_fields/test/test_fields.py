@@ -1,7 +1,7 @@
 from datetime import date, datetime
 
 from django.db import connection
-from django.utils.encoding import force_bytes, force_str
+from django.utils.encoding import force_bytes
 import pytest
 
 from . import models
@@ -21,6 +21,7 @@ from . import models
             [datetime(2015, 2, 5, 15), datetime(2015, 2, 8, 16)],
         ),
         (models.EncryptedCharWithAlternateKeyset, ["foo", "bar"]),
+        (models.EncryptedBinary, [b"1234", b"asdf"]),
     ],
 )
 class TestEncryptedFieldQueries(object):
@@ -32,15 +33,23 @@ class TestEncryptedFieldQueries(object):
         with connection.cursor() as cur:
             cur.execute("SELECT value FROM %s" % model._meta.db_table)
             data = [
-                force_str(
-                    field._get_aead_primitive().decrypt(
+                field.to_python_prepare(
+                    field._aead_primitive.decrypt(
                         force_bytes(r[0]), aad_callback(field)
                     )
                 )
                 for r in cur.fetchall()
             ]
 
-        assert list(map(field.to_python, data)) == [vals[0]]
+        if model is models.EncryptedBinary:
+            assert list([bytes(field.to_python(item)) for item in data]) == [vals[0]]
+        else:
+            assert list(map(field.to_python, data)) == [vals[0]]
+
+
+def test_encrypted_nullable(db):
+    models.EncryptedNullable(value=None).save()
+    assert models.EncryptedNullable.objects.get(value__isnull=True)
 
 
 @pytest.mark.parametrize(
@@ -60,8 +69,8 @@ class TestDeterministicEncryptedFieldQueries(object):
         with connection.cursor() as cur:
             cur.execute("SELECT value FROM %s" % model._meta.db_table)
             data = [
-                force_str(
-                    field._get_daead_primitive().decrypt_deterministically(
+                field.to_python_prepare(
+                    field._daead_primitive.decrypt_deterministically(
                         force_bytes(r[0]), aad_callback(field)
                     )
                 )
@@ -76,3 +85,8 @@ class TestDeterministicEncryptedFieldQueries(object):
         out = model.objects.filter(value=vals[0])
         assert len(out) == 1
         assert out[0].value == vals[0]
+
+
+def test_encrypted_deterministic_nullable(db):
+    models.DeterministicEncryptedIntNullable(value=None).save()
+    assert models.DeterministicEncryptedIntNullable.objects.get(value=None)
