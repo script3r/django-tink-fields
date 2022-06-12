@@ -1,4 +1,4 @@
-from typing import Any, Callable, TYPE_CHECKING
+from typing import Any, Callable, TYPE_CHECKING, Dict
 from django.db import models
 from django.core.exceptions import FieldError, ImproperlyConfigured
 from django.utils.functional import cached_property
@@ -31,6 +31,32 @@ __all__ = [
     "DeterministicEncryptedIntegerField",
 ]
 
+_config: Dict[str, KeysetConfig] = {}
+
+
+def _get_config(keyset: str) -> KeysetConfig:
+    global _config
+
+    if keyset in _config:
+        return _config[keyset]
+
+    config = getattr(settings, "TINK_FIELDS_CONFIG", None)
+    if config is None:
+        raise ImproperlyConfigured(
+            f"Could not find `TINK_FIELDS_CONFIG` attribute in settings"
+        )
+
+    if keyset not in config:
+        raise ImproperlyConfigured(
+            f"Could not find configuration for keyset `{keyset}` in `TINK_FIELDS_CONFIG`"
+        )
+
+    keyset_config = KeysetConfig(**config[keyset])
+    keyset_config.validate()
+    _config[keyset] = keyset_config
+
+    return keyset_config
+
 
 class BaseEncryptedField(models.Field):
     _unsupported_properties = ["primary_key", "db_index", "unique"]
@@ -54,21 +80,7 @@ class BaseEncryptedField(models.Field):
         super(BaseEncryptedField, self).__init__(*args, **kwargs)
 
     def _get_config(self) -> KeysetConfig:
-        config = getattr(settings, "TINK_FIELDS_CONFIG", None)
-        if config is None:
-            raise ImproperlyConfigured(
-                f"Could not find `TINK_FIELDS_CONFIG` attribute in settings"
-            )
-
-        if self._keyset not in config:
-            raise ImproperlyConfigured(
-                f"Could not find configuration for keyset `{self._keyset}` in `TINK_FIELDS_CONFIG`"
-            )
-
-        keyset_config = KeysetConfig(**config[self._keyset])
-        keyset_config.validate()  # TODO: Reuse config
-
-        return keyset_config
+        return _get_config(self._keyset)
 
     def get_internal_type(self) -> str:
         return self._internal_type
