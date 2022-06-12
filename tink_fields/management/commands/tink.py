@@ -28,11 +28,11 @@ class Command(BaseCommand):
             help="Key template (see tinkey list-key-templates)",
         )
 
-        create_key = subparsers.add_parser(
-            "create-key", help="Create a non-primary key in a keyset"
+        add_key = subparsers.add_parser(
+            "add-key", help="Add a non-primary key to a keyset"
         )
-        create_key.add_argument("name", help="Keyset name")
-        create_key.add_argument(
+        add_key.add_argument("name", help="Keyset name")
+        add_key.add_argument(
             "template", help="Key template (see tinkey list-key-templates)"
         )
 
@@ -65,8 +65,8 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         if options["subcommand"] == "create-keyset":
             return self.create_keyset(*args, **options)
-        elif options["subcommand"] == "create-key":
-            return self.create_key(*args, **options)
+        elif options["subcommand"] == "add-key":
+            return self.add_key(*args, **options)
         elif options["subcommand"] == "promote-key":
             return self.promote_key(*args, **options)
         elif options["subcommand"] == "list-keys":
@@ -84,7 +84,7 @@ class Command(BaseCommand):
         keyset = Keyset.create(name, get_key_template_by_name(template))
         self.stdout.write(self.style.SUCCESS(f"Created keyset {keyset.id}"))
 
-    def create_key(self, name: str, template: str, *args, **options):
+    def add_key(self, name: str, template: str, *args, **options):
         try:
             keyset = Keyset.objects.get(name=name)
         except Keyset.DoesNotExist:
