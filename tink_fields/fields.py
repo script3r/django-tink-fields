@@ -158,7 +158,7 @@ class DeterministicEncryptedField(BaseEncryptedField):
         return self._keyset_handle.primitive(daead.DeterministicAead)
 
     def get_db_prep_value(
-        self, value: Any, connection: "BaseDatabaseWrappr", prepared=False
+        self, value: Any, connection: "BaseDatabaseWrapper", prepared=False
     ) -> Any:
 
         val = super(DeterministicEncryptedField, self).get_db_prep_value(
