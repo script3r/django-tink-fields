@@ -21,12 +21,13 @@ class Keyset(models.Model):
     @classmethod
     def create(cls, name: str, key_template: tink_pb2.KeyTemplate) -> "Keyset":
         """Create a keyset with one primary key"""
-        instance = cls(name=name, type_url=key_template.type_url)
-        instance.save()
+        with transaction.atomic():
+            instance = cls(name=name, type_url=key_template.type_url)
+            instance.save()
 
-        key = instance.generate_key(key_template)
-        key.is_primary = True
-        key.save()
+            key = instance.generate_key(key_template)
+            key.is_primary = True
+            key.save()
 
         return instance
 
@@ -60,6 +61,18 @@ class Keyset(models.Model):
     @cached_property
     def primitive_set(self) -> PrimitiveSet:
         return _DatabasePrimitiveKeyset(self, self.key_manager().primitive_class())
+
+    def export_keyset(self) -> tink_pb2.Keyset:
+        return tink_pb2.Keyset(
+            primary_key_id=self.key_set.get(is_primary=True).id,
+            key=[key.key for key in self.key_set.all()],
+        )
+
+    def export_keyset_info(self) -> tink_pb2.KeysetInfo:
+        return tink_pb2.KeysetInfo(
+            primary_key_id=self.key_set.get(is_primary=True).id,
+            key_info=[key.key_info for key in self.key_set.all()],
+        )
 
 
 class _DatabasePrimitiveKeyset(PrimitiveSet[P]):
@@ -156,6 +169,15 @@ class Key(models.Model):
     def key(self) -> tink_pb2.Keyset.Key:
         return tink_pb2.Keyset.Key(
             key_data=self.key_data_pb,
+            status=self.status,
+            key_id=self.id,
+            output_prefix_type=self.output_prefix_type,
+        )
+
+    @cached_property
+    def key_info(self) -> tink_pb2.KeysetInfo.KeyInfo:
+        return tink_pb2.KeysetInfo.KeyInfo(
+            type_url=self.keyset.type_url,
             status=self.status,
             key_id=self.id,
             output_prefix_type=self.output_prefix_type,
