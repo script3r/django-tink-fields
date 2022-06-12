@@ -57,20 +57,16 @@ class Command(BaseCommand):
         unsafe_export_keyset.add_argument("name", help="Keyset name")
 
     def handle(self, *args, **options):
-        if options["subcommand"] == "create-keyset":
-            return self.create_keyset(*args, **options)
-        elif options["subcommand"] == "add-key":
-            return self.add_key(*args, **options)
-        elif options["subcommand"] == "promote-key":
-            return self.promote_key(*args, **options)
-        elif options["subcommand"] == "list-keyset":
-            return self.list_keyset(*args, **options)
-        elif options["subcommand"] == "unsafe-export-keyset":
-            return self.unsafe_export_keyset(*args, **options)
-        elif options["subcommand"] == "delete-keyset":
-            return self.delete_keyset(*args, **options)
-        else:
-            raise CommandError("invalid subcommand")
+        subcommand_map = {
+            "create_keyset": self.create_keyset,
+            "add-key": self.add_key,
+            "promote-key": self.promote_key,
+            "list-keyset": self.list_keyset,
+            "unsafe-export-keyset": self.unsafe_export_keyset,
+            "delete-keyset": self.delete_keyset,
+        }
+
+        return subcommand_map[options["subcommand"]](*args, **options)
 
     def create_keyset(self, name: str, template: str, *args, **options):
         keyset = Keyset.create(name, get_key_template_by_name(template))
