@@ -168,7 +168,7 @@ class Key(models.Model):
     is_primary = models.BooleanField()
 
     # Serialized KeyData
-    key_data = EncryptedBinaryField(editable=False)
+    key_data = EncryptedBinaryField(keyset="db_keyset", editable=False)
     status = models.PositiveIntegerField(choices=tink_pb2.KeyStatusType.items())
     output_prefix_type = models.PositiveIntegerField(
         choices=tink_pb2.OutputPrefixType.items()

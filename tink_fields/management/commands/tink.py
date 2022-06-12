@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand, CommandError, CommandParser
 from tink.proto import tink_pb2
-from google.protobuf import json_format
+from google.protobuf import json_format, text_format
 
 from tink_fields.models import Keyset, Key
 from tink.aead import aead_key_templates
@@ -42,8 +42,8 @@ class Command(BaseCommand):
         promote_key.add_argument("name", help="Keyset name")
         promote_key.add_argument("id", help="Key ID", type=int)
 
-        list_keys = subparsers.add_parser("list-keys", help="List keys a keyset")
-        list_keys.add_argument("name", help="Keyset name")
+        list_keyset = subparsers.add_parser("list-keyset", help="List keys a keyset")
+        list_keyset.add_argument("name", help="Keyset name")
 
         delete_keyset = subparsers.add_parser(
             "delete-keyset", help="Delete keyset and all associated keys"
@@ -56,12 +56,6 @@ class Command(BaseCommand):
         )
         unsafe_export_keyset.add_argument("name", help="Keyset name")
 
-        export_keyset_info = subparsers.add_parser(
-            "export-keyset-info",
-            help="Export keyset info as JSON",
-        )
-        export_keyset_info.add_argument("name", help="Keyset name")
-
     def handle(self, *args, **options):
         if options["subcommand"] == "create-keyset":
             return self.create_keyset(*args, **options)
@@ -69,12 +63,10 @@ class Command(BaseCommand):
             return self.add_key(*args, **options)
         elif options["subcommand"] == "promote-key":
             return self.promote_key(*args, **options)
-        elif options["subcommand"] == "list-keys":
-            return self.list_keys(*args, **options)
+        elif options["subcommand"] == "list-keyset":
+            return self.list_keyset(*args, **options)
         elif options["subcommand"] == "unsafe-export-keyset":
             return self.unsafe_export_keyset(*args, **options)
-        elif options["subcommand"] == "export-keyset-info":
-            return self.export_keyset_info(*args, **options)
         elif options["subcommand"] == "delete-keyset":
             return self.delete_keyset(*args, **options)
         else:
@@ -107,16 +99,10 @@ class Command(BaseCommand):
         keyset.set_primary_key(key)
         self.stdout.write(f"Key {key.pk} promoted to primary")
 
-    def list_keys(self, name: str, *args, **options):
+    def list_keyset(self, name: str, *args, **options):
         try:
             keyset = Keyset.objects.get(name=name)
-            self.stdout.write(f"Key type: {keyset.type_url}")
-            self.stdout.write("")
-            self.stdout.write("ID\tPrimary\tStatus\tPrefix")
-            for key in keyset.key_set.all():
-                self.stdout.write(
-                    f"{key.id}\t{'Y' if key.is_primary else 'N'}\t{tink_pb2.KeyStatusType.Name(key.status)}\t{tink_pb2.OutputPrefixType.Name(key.output_prefix_type)}"
-                )
+            self.stdout.write(text_format.MessageToString(keyset.export_keyset_info()))
         except Keyset.DoesNotExist:
             raise CommandError(f'Keyset "{name}" not found')
 
