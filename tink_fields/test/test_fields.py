@@ -85,8 +85,3 @@ class TestDeterministicEncryptedFieldQueries(object):
         out = model.objects.filter(value=vals[0])
         assert len(out) == 1
         assert out[0].value == vals[0]
-
-
-def test_encrypted_deterministic_nullable(db):
-    models.DeterministicEncryptedIntNullable(value=None).save()
-    assert models.DeterministicEncryptedIntNullable.objects.get(value=None)

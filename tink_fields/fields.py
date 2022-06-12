@@ -1,6 +1,7 @@
 from django.utils.functional import cached_property
 from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 from django.db import models
+from django.db.models.lookups import In
 from django.core.exceptions import FieldError, ImproperlyConfigured
 from tink import (
     KeysetHandle,
@@ -135,18 +136,14 @@ class EncryptedField(BaseEncryptedField):
         val = super(EncryptedField, self).get_db_prep_save(value, connection)
         if val is not None:
             return connection.Database.Binary(
-                self._aead_primitive.encrypt(
-                    force_bytes(val), self._aad_callback(self)
-                )
+                self._aead_primitive.encrypt(force_bytes(val), self._aad_callback(self))
             )
 
     def from_db_value(self, value, expression, connection, *args):
         if value is not None:
             return self.to_python(
                 self.to_python_prepare(
-                    self._aead_primitive.decrypt(
-                        bytes(value), self._aad_callback(self)
-                    )
+                    self._aead_primitive.decrypt(bytes(value), self._aad_callback(self))
                 )
             )
 
@@ -184,6 +181,31 @@ class DeterministicEncryptedField(BaseEncryptedField):
                 )
             )
 
+    def get_db_values_all_keys(
+        self, value: Any, connection: "BaseDatabaseWrapper", prepared=False
+    ) -> Any:
+        """Like get_db_prep_value but return array of values encrypted with every keys in the keyset"""
+        val = super(DeterministicEncryptedField, self).get_db_prep_value(
+            value, connection, prepared
+        )
+        if val is None:
+            return []
+
+        out = []
+        aad = self._aad_callback(self)
+        # XXX: This would run another query. Is there any way to signal that we want a cached all using
+        # the same primitive set interface?
+        for items in self._daead_primitive._primitive_set.all():
+            for key in items:
+                out.append(
+                    connection.Database.Binary(
+                        key.identifier
+                        + key.primitive.encrypt_deterministically(force_bytes(val), aad)
+                    )
+                )
+
+        return out
+
 
 def get_prep_lookup(self):
     """Raise errors for unsupported lookups"""
@@ -194,29 +216,32 @@ def get_prep_lookup(self):
     )
 
 
-lookup_allowlist = {
-    (object, "isnull"),
-    (DeterministicEncryptedField, "exact"),
-}
+class DeterministicEncryptedFieldExactLookup(In):
+    lookup_name = "exact"
+
+    def get_prep_lookup(self):
+        self.rhs = [self.rhs]
+        return super().get_prep_lookup()
+
+    def get_db_prep_lookup(self, value, connection):
+        assert len(value) == 1
+        return (
+            "%s",
+            self.lhs.output_field.get_db_values_all_keys(
+                list(value)[0], connection, prepared=True
+            ),
+        )
 
 
-def is_lookup_allowed(cls, name) -> bool:
-    for item in lookup_allowlist:
-        if item[1] == name and issubclass(cls, item[0]):
-            return True
-    return False
-
-
-# Override all lookups except in lookup_allowlist to get_prep_lookup
 for name, lookup in models.Field.class_lookups.items():
     for cls in (EncryptedField, DeterministicEncryptedField):
-        if is_lookup_allowed(cls, name):
-            continue
+        if name != "isnull":
+            lookup_class = type(
+                cls.__name__ + name, (lookup,), {"get_prep_lookup": get_prep_lookup}
+            )
+            cls.register_lookup(lookup_class)
 
-        lookup_class = type(
-            cls.__name__ + "__" + name, (lookup,), {"get_prep_lookup": get_prep_lookup}
-        )
-        cls.register_lookup(lookup_class)
+DeterministicEncryptedField.register_lookup(DeterministicEncryptedFieldExactLookup)
 
 
 class EncryptedTextField(EncryptedField, models.TextField):
