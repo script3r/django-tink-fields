@@ -35,6 +35,10 @@ class EncryptedNullable(models.Model):
     value = fields.EncryptedIntegerField(null=True)
 
 
+class EncryptedIntEnvelope(models.Model):
+    value = fields.EncryptedIntegerField(keyset="db_aead")
+
+
 def sample_aad_provider(instance) -> bytes:
     return force_bytes(instance.__class__.__name__)
 
@@ -61,3 +65,7 @@ class DeterministicEncryptedInt(models.Model):
 
 class DeterministicEncryptedIntNullable(models.Model):
     value = fields.DeterministicEncryptedIntegerField(keyset="daead", null=True)
+
+
+class DeterministicEncryptedIntEnvelope(models.Model):
+    value = fields.DeterministicEncryptedIntegerField(keyset="db_daead")

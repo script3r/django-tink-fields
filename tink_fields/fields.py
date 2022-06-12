@@ -1,19 +1,16 @@
-from django.utils.functional import cached_property
-from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
+from typing import Any, Callable, TYPE_CHECKING
 from django.db import models
 from django.core.exceptions import FieldError, ImproperlyConfigured
+from django.utils.functional import cached_property
 from tink import (
     KeysetHandle,
-    cleartext_keyset_handle,
-    read_keyset_handle,
-    JsonKeysetReader,
     aead,
     daead,
 )
 from django.conf import settings
-from dataclasses import dataclass
-from os.path import exists
 from django.utils.encoding import force_bytes, force_str
+
+from tink_fields.config import KeysetConfig
 
 if TYPE_CHECKING:
     from django.db.backends.base.base import BaseDatabaseWrapper
@@ -35,31 +32,12 @@ __all__ = [
 ]
 
 
-@dataclass
-class KeysetConfig:
-    path: str
-    master_key_aead: Optional[aead.Aead] = None
-    cleartext: bool = False
-
-    def validate(self):
-        if not self.path:
-            raise ImproperlyConfigured("Keyset path cannot be None or empty")
-
-        if not exists(self.path):
-            raise ImproperlyConfigured(f"Keyset {self.path} does not exist")
-
-        if not self.cleartext and self.master_key_aead is None:
-            raise ImproperlyConfigured(
-                f"Encrypted keysets must specify `master_key_aead`"
-            )
-
-
 class BaseEncryptedField(models.Field):
     _unsupported_properties = ["primary_key", "db_index", "unique"]
     _internal_type = "BinaryField"
 
     _keyset: str
-    _keyset_handle: KeysetHandle
+    _keyset_config: KeysetConfig
     _aad_callback: Callable[[models.Field], bytes]
 
     def __init__(self, *args, **kwargs):
@@ -70,22 +48,17 @@ class BaseEncryptedField(models.Field):
                 )
 
         self._keyset = kwargs.pop("keyset", "default")
-        self._keyset_handle = self._get_tink_keyset_handle()
+        self._keyset_config = self._get_config()
         self._aad_callback = kwargs.pop("aad_callback", lambda x: b"")
 
         super(BaseEncryptedField, self).__init__(*args, **kwargs)
 
-    def _get_config(self) -> Dict[str, Any]:
+    def _get_config(self) -> KeysetConfig:
         config = getattr(settings, "TINK_FIELDS_CONFIG", None)
         if config is None:
             raise ImproperlyConfigured(
                 f"Could not find `TINK_FIELDS_CONFIG` attribute in settings"
             )
-        return config
-
-    def _get_tink_keyset_handle(self) -> KeysetHandle:
-        """Read the configuration for the requested keyset and return a respective keyset handle"""
-        config = self._get_config()
 
         if self._keyset not in config:
             raise ImproperlyConfigured(
@@ -93,13 +66,9 @@ class BaseEncryptedField(models.Field):
             )
 
         keyset_config = KeysetConfig(**config[self._keyset])
-        keyset_config.validate()
+        keyset_config.validate()  # TODO: Reuse config
 
-        with open(keyset_config.path, "r") as f:
-            reader = JsonKeysetReader(f.read())
-            if keyset_config.cleartext:
-                return cleartext_keyset_handle.read(reader)
-            return read_keyset_handle(reader, keyset_config.master_key_aead)
+        return keyset_config
 
     def get_internal_type(self) -> str:
         return self._internal_type
@@ -129,24 +98,20 @@ class EncryptedField(BaseEncryptedField):
 
     @cached_property
     def _aead_primitive(self) -> aead.Aead:
-        return self._keyset_handle.primitive(aead.Aead)
+        return self._keyset_config.primitive(aead.Aead)
 
     def get_db_prep_save(self, value: Any, connection: "BaseDatabaseWrapper") -> Any:
         val = super(EncryptedField, self).get_db_prep_save(value, connection)
         if val is not None:
             return connection.Database.Binary(
-                self._aead_primitive.encrypt(
-                    force_bytes(val), self._aad_callback(self)
-                )
+                self._aead_primitive.encrypt(force_bytes(val), self._aad_callback(self))
             )
 
     def from_db_value(self, value, expression, connection, *args):
         if value is not None:
             return self.to_python(
                 self.to_python_prepare(
-                    self._aead_primitive.decrypt(
-                        bytes(value), self._aad_callback(self)
-                    )
+                    self._aead_primitive.decrypt(bytes(value), self._aad_callback(self))
                 )
             )
 
@@ -158,12 +123,11 @@ class DeterministicEncryptedField(BaseEncryptedField):
 
     @cached_property
     def _daead_primitive(self) -> daead.DeterministicAead:
-        return self._keyset_handle.primitive(daead.DeterministicAead)
+        return self._keyset_config.primitive(daead.DeterministicAead)
 
     def get_db_prep_value(
-        self, value: Any, connection: "BaseDatabaseWrappr", prepared=False
+        self, value: Any, connection: "BaseDatabaseWrapper", prepared=False
     ) -> Any:
-
         val = super(DeterministicEncryptedField, self).get_db_prep_value(
             value, connection, prepared
         )
@@ -196,7 +160,7 @@ def get_prep_lookup(self):
 
 lookup_allowlist = {
     (object, "isnull"),
-    (DeterministicEncryptedField, "exact"),
+    (DeterministicEncryptedField, "exact"),  # TODO: Support key rotation
 }
 
 

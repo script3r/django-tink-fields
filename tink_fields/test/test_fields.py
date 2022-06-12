@@ -3,8 +3,22 @@ from datetime import date, datetime
 from django.db import connection
 from django.utils.encoding import force_bytes
 import pytest
+from tink import aead, daead
 
 from . import models
+
+
+@pytest.fixture(autouse=True)
+def configured_db_keyset(db):
+    for name, template in {
+        "aead": aead.aead_key_templates.AES256_GCM,
+        "daead": daead.deterministic_aead_key_templates.AES256_SIV,
+    }.items():
+        model = Keyset.create(name=name, key_template=template)
+        model.save()
+
+
+from ..models import Keyset
 
 
 @pytest.mark.parametrize(
@@ -21,6 +35,7 @@ from . import models
             [datetime(2015, 2, 5, 15), datetime(2015, 2, 8, 16)],
         ),
         (models.EncryptedCharWithAlternateKeyset, ["foo", "bar"]),
+        (models.EncryptedIntEnvelope, [1, 2]),
         (models.EncryptedBinary, [b"1234", b"asdf"]),
     ],
 )
@@ -58,6 +73,7 @@ def test_encrypted_nullable(db):
         (models.DeterministicEncryptedChar, ["one", "two"]),
         (models.DeterministicEncryptedEmail, ["a@example.com", "b@example.com"]),
         (models.DeterministicEncryptedInt, [1, 2]),
+        (models.DeterministicEncryptedIntEnvelope, [1, 2]),
     ],
 )
 class TestDeterministicEncryptedFieldQueries(object):

@@ -1,4 +1,5 @@
 INSTALLED_APPS = [
+    "tink_fields",
     "tink_fields.test",
 ]
 
