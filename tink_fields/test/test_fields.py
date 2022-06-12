@@ -6,6 +6,7 @@ import pytest
 from tink import aead, daead
 
 from . import models
+from ..models import Keyset
 
 
 @pytest.fixture(autouse=True)
@@ -16,9 +17,6 @@ def configured_db_keyset(db):
     }.items():
         model = Keyset.create(name=name, key_template=template)
         model.save()
-
-
-from ..models import Keyset
 
 
 @pytest.mark.parametrize(
@@ -103,6 +101,27 @@ class TestDeterministicEncryptedFieldQueries(object):
         assert out[0].value == vals[0]
 
 
-def test_encrypted_deterministic_nullable(db):
-    models.DeterministicEncryptedIntNullable(value=None).save()
-    assert models.DeterministicEncryptedIntNullable.objects.get(value=None)
+def test_rotated_deterministic_field(db):
+    value = 12345678
+
+    models.DeterministicEncryptedIntEnvelope(value=value).save()
+    assert (
+        models.DeterministicEncryptedIntEnvelope.objects.filter(value=value).count()
+        == 1
+    )
+
+    keyset = Keyset.objects.get(name="daead")
+    new_key = keyset.generate_key(daead.deterministic_aead_key_templates.AES256_SIV)
+    keyset.set_primary_key(new_key)
+
+    value_2 = 23456789
+    models.DeterministicEncryptedIntEnvelope(value=value_2).save()
+
+    assert (
+        models.DeterministicEncryptedIntEnvelope.objects.filter(value=value).count()
+        == 1
+    )
+    assert (
+        models.DeterministicEncryptedIntEnvelope.objects.filter(value=value_2).count()
+        == 1
+    )

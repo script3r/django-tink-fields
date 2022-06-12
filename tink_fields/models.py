@@ -84,6 +84,10 @@ class _DatabasePrimitiveKeyset(PrimitiveSet[P]):
         del self._primary
 
     def primitive_from_identifier(self, identifier: bytes) -> List[Entry]:
+        # Fast path - non raw keys will have unique identifiers
+        if len(identifier) > 0 and identifier in self._primitives:
+            return super().primitive_from_identifier(identifier)
+
         for key in (
             self._keyset.key_set.filter(output_prefix=identifier)
             .exclude(id__in=list(self._all_cached_key_ids()))
@@ -93,14 +97,22 @@ class _DatabasePrimitiveKeyset(PrimitiveSet[P]):
 
         return super().primitive_from_identifier(identifier)
 
-    def entry_by_id(self, identifier: bytes, key_id: int) -> Optional[Entry]:
+    def _entry_by_id(self, identifier: bytes, key_id: int) -> Optional[Entry]:
+        # Fast path - non raw keys will have unique identifiers
+        if (
+            len(identifier) > 0
+            and identifier in self._primitives
+            and len(self._primitives[identifier]) == 1
+        ):
+            return self._primitives[identifier][0]
+
         primitives = self._primitives.get(identifier, [])
         for item in primitives:
             if item.key_id == key_id:
                 return item
 
     def _add_key_to_cache(self, key: "Key"):
-        if not self.entry_by_id(key.output_prefix, key.id):
+        if not self._entry_by_id(key.output_prefix, key.id):
             entries = self._primitives.setdefault(key.output_prefix, [])
             entries.append(key.entry)
 
@@ -139,7 +151,7 @@ class _DatabasePrimitiveKeyset(PrimitiveSet[P]):
 
     def primary(self) -> Entry:
         key = self._keyset.key_set.get(is_primary=True)
-        entry = self.entry_by_id(key.output_prefix, key.id)
+        entry = self._entry_by_id(key.output_prefix, key.id)
         if entry:
             return entry
 
