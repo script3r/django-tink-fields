@@ -16,24 +16,23 @@ P = TypeVar("P")
 
 class Keyset(models.Model):
     name = models.CharField(max_length=100, unique=True)
-    type_url = models.CharField(max_length=250)
+    primary_key = models.ForeignKey(
+        "Key", on_delete=models.PROTECT, related_name="primary_key", null=True
+    )
 
     @classmethod
     def create(cls, name: str, key_template: tink_pb2.KeyTemplate) -> "Keyset":
         """Create a keyset with one primary key"""
         with transaction.atomic():
-            instance = cls(name=name, type_url=key_template.type_url)
+            instance = cls(name=name)
             instance.save()
-
-            key = instance.generate_key(key_template)
-            key.is_primary = True
-            key.save()
+            instance.primary_key = instance.generate_key(key_template)
 
         return instance
 
     def generate_key(self, key_template: tink_pb2.KeyTemplate) -> "Key":
         """Create and save a key"""
-        key_data = self.key_manager().new_key_data(key_template)
+        key_data = Registry.new_key_data(key_template)
         key = Key.create_from_keydata(self, key_data, key_template.output_prefix_type)
 
         return key
@@ -43,34 +42,32 @@ class Keyset(models.Model):
         if isinstance(key, Key):
             key_id = key.pk
 
-        with transaction.atomic():
-            self.key_set.update(is_primary=False)
-            self.key_set.filter(pk=key_id).update(is_primary=True)
+        self.primary_key_id = key_id
+        self.save(update_fields=["primary_key"])
 
-    def key_manager(self) -> "KeyManager":
-        return Registry.key_manager(self.type_url)
-
-    @property
-    def primitive(self) -> P:
+    def primitive(self, primitive_class: Type[P]) -> P:
         """Get primitive of the stored type"""
+        # Hack: assuming that a key would only contain one primitive_class
+        self._primitive_set._primitive_class = primitive_class
         return Registry.wrap(
-            self.primitive_set,
-            self.key_manager().primitive_class(),
+            self._primitive_set,
+            primitive_class,
         )
 
     @cached_property
-    def primitive_set(self) -> PrimitiveSet:
-        return _DatabasePrimitiveKeyset(self, self.key_manager().primitive_class())
+    def _primitive_set(self) -> PrimitiveSet:
+        # XXX: This would return keyset of the concrete type instead of interface type
+        return _DatabasePrimitiveKeyset(self, self.primary_key.primitive)
 
     def export_keyset(self) -> tink_pb2.Keyset:
         return tink_pb2.Keyset(
-            primary_key_id=self.key_set.get(is_primary=True).id,
+            primary_key_id=self.primary_key_id,
             key=[key.key for key in self.key_set.all()],
         )
 
     def export_keyset_info(self) -> tink_pb2.KeysetInfo:
         return tink_pb2.KeysetInfo(
-            primary_key_id=self.key_set.get(is_primary=True).id,
+            primary_key_id=self.primary_key_id,
             key_info=[key.key_info for key in self.key_set.all()],
         )
 
@@ -84,7 +81,7 @@ class _DatabasePrimitiveKeyset(PrimitiveSet[P]):
         del self._primary
 
     def primitive_from_identifier(self, identifier: bytes) -> List[Entry]:
-        # Fast path - non raw keys will have unique identifiers
+        # Fast path - non raw keys should have unique identifiers
         if len(identifier) > 0 and identifier in self._primitives:
             return super().primitive_from_identifier(identifier)
 
@@ -98,7 +95,7 @@ class _DatabasePrimitiveKeyset(PrimitiveSet[P]):
         return super().primitive_from_identifier(identifier)
 
     def _entry_by_id(self, identifier: bytes, key_id: int) -> Optional[Entry]:
-        # Fast path - non raw keys will have unique identifiers
+        # Fast path - non raw keys should have unique identifiers
         if (
             len(identifier) > 0
             and identifier in self._primitives
@@ -150,7 +147,7 @@ class _DatabasePrimitiveKeyset(PrimitiveSet[P]):
         self._keyset.set_primary_key(entry.key_id)
 
     def primary(self) -> Entry:
-        key = self._keyset.key_set.get(is_primary=True)
+        key = self._keyset.primary_key
         entry = self._entry_by_id(key.output_prefix, key.id)
         if entry:
             return entry
@@ -162,10 +159,10 @@ class _DatabasePrimitiveKeyset(PrimitiveSet[P]):
 class Key(models.Model):
     """Key instance in a keyset.
 
-    It is expected that Key is immutable except for is_primary, status field"""
+    It is expected that Key is immutable except for the status field"""
 
     keyset = models.ForeignKey(Keyset, on_delete=models.CASCADE, editable=False)
-    is_primary = models.BooleanField()
+    type_url = models.CharField(max_length=250)
 
     # Serialized KeyData
     key_data = EncryptedBinaryField(keyset="db_keyset", editable=False)
@@ -189,11 +186,14 @@ class Key(models.Model):
     @cached_property
     def key_info(self) -> tink_pb2.KeysetInfo.KeyInfo:
         return tink_pb2.KeysetInfo.KeyInfo(
-            type_url=self.keyset.type_url,
+            type_url=self.type_url,
             status=self.status,
             key_id=self.id,
             output_prefix_type=self.output_prefix_type,
         )
+
+    def key_manager(self) -> "KeyManager":
+        return Registry.key_manager(self.type_url)
 
     @property
     def key_data_pb(self) -> tink_pb2.KeyData:
@@ -203,10 +203,7 @@ class Key(models.Model):
 
     @property
     def primitive(self) -> P:
-        return Registry.primitive(
-            self.key_data_pb,
-            self.keyset.key_manager().primitive_class(),
-        )
+        return self.key_manager().primitive(self.key_data_pb)
 
     @cached_property
     def entry(self) -> Entry:
@@ -222,8 +219,8 @@ class Key(models.Model):
     def from_key(cls, keyset: "Keyset", key: tink_pb2.Keyset.Key):
         return cls(
             id=key.key_id,
-            is_primary=False,
             keyset=keyset,
+            type_url=key.key_data.type_url,
             data=key.key_data.SerializeToString(),
             status=key.status,
             output_prefix=crypto_format.output_prefix(key),
@@ -240,7 +237,7 @@ class Key(models.Model):
         with transaction.atomic():
             out = cls(
                 keyset=keyset,
-                is_primary=False,
+                type_url=keydata.type_url,
                 key_data=keydata.SerializeToString(),
                 status=tink_pb2.ENABLED,
                 output_prefix_type=output_prefix_type,
@@ -251,12 +248,3 @@ class Key(models.Model):
             out.save()
 
         return out
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                name="one_primary_per_keyset",
-                fields=("keyset", "is_primary"),
-                condition=models.Q(is_primary=True),
-            ),
-        ]

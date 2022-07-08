@@ -44,7 +44,7 @@ class KeysetConfig:
         if self.path:
             return self._load_from_path.primitive(cls)
         if self.db_name:
-            return self._load_from_db.primitive
+            return self._load_from_db.primitive(cls)
 
     @cached_property
     def _load_from_path(self) -> KeysetHandle:
