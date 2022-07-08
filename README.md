@@ -89,6 +89,12 @@ class AnotherModel(models.Model):
 
 Supported field types include: `EncryptedCharField`, `EncryptedTextField`, `EncryptedDateField`, `EncryptedDateTimeField`, `EncryptedEmailField`, and `EncryptedIntegerField`.
 
+## Deterministic Encryption
+
+`DeterministicEncryptedCharField` provides support for [Deterministic AEAD](https://developers.google.com/tink/deterministic-aead) which means value in the field can be queried with exact matches. However, unlike normal AEAD encryption, an attacker can verify that two messages are equal.
+
+Deterministic encryption requires key of type `AES-SIV` and supports Associated Data.
+
 ### Associated Data
 
 The encrypted fields make use of `Authenticated Encryption With Associated Data (AEAD)` which offers confidentiality and integrity within the same mode of operation. This allows the caller to specify a cleartext fragment named `additional authenticated data (aad)` to the encryption and decryption operations and receive cryptographic guarantees that the ciphertext data has not been tampered with.
