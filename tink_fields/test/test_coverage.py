@@ -24,7 +24,7 @@ class TestKeysetConfigValidation:
     def test_keyset_config_none_path(self):
         """Test KeysetConfig validation with None path (line 38)"""
         with pytest.raises(ImproperlyConfigured, match="Keyset path cannot be None or empty"):
-            KeysetConfig(path=None)  # type: ignore[arg-type]
+            KeysetConfig(path=None)
 
     def test_keyset_config_nonexistent_path(self):
         """Test KeysetConfig validation with non-existent path (line 41)"""
@@ -142,7 +142,7 @@ class TestDatabaseValueHandling:
         result = field.get_db_prep_save("test_value", connection)
         assert result is not None
         # The result should be a Binary object
-        assert hasattr(result, "Binary") or hasattr(connection.Database, "Binary")  # type: ignore[attr-defined]
+        assert hasattr(result, "Binary") or hasattr(connection.Database, "Binary")
 
 
 class TestLookupErrors:
@@ -188,13 +188,13 @@ class TestDatabaseOperationsWithValues:
         with connection.cursor() as cursor:
             cursor.execute(
                 f"SELECT value FROM {models.EncryptedText._meta.db_table} " f"WHERE id = %s",
-                [test_instance.id],  # type: ignore[attr-defined]
+                [test_instance.id],
             )
             raw_value = cursor.fetchone()[0]
 
         # Test from_db_value with the raw encrypted value
         field = models.EncryptedText._meta.get_field("value")
-        result = field.from_db_value(raw_value, None, connection)  # type: ignore[union-attr]
+        result = field.from_db_value(raw_value, None, connection)
         assert result == "test_value"
 
 
@@ -209,5 +209,5 @@ class TestCleartextKeysetIntegration:
         assert test_instance.value == "test_value"
 
         # Verify the value is stored correctly
-        retrieved = models.EncryptedText.objects.get(id=test_instance.id)  # type: ignore[attr-defined]
+        retrieved = models.EncryptedText.objects.get(id=test_instance.id)
         assert retrieved.value == "test_value"
