@@ -125,6 +125,10 @@ strict_equality = true
 module = "tink_fields.test.*"
 disallow_untyped_defs = false
 
+[[tool.mypy.overrides]]
+module = "tink"
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "tink_fields.test.settings.sqlite"
 testpaths = ["tink_fields/test"]
