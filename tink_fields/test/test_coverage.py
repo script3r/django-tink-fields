@@ -1,15 +1,14 @@
 import os
 import tempfile
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from django.conf import settings
 from django.core.exceptions import FieldError, ImproperlyConfigured
 from django.db import connection
-from django.test import TestCase, override_settings
 
 import pytest
 
-from tink_fields.fields import EncryptedField, EncryptedTextField, KeysetConfig
+from tink_fields.fields import EncryptedTextField, KeysetConfig
 
 from . import models
 
@@ -59,7 +58,8 @@ class TestFieldPropertyValidation:
     def test_primary_key_not_supported(self):
         """Test that primary_key property raises ImproperlyConfigured"""
         with pytest.raises(
-            ImproperlyConfigured, match="does not support property `primary_key`"
+            ImproperlyConfigured,
+            match="does not support property `primary_key`",
         ):
             EncryptedTextField(primary_key=True)
 

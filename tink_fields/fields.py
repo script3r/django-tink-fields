@@ -7,11 +7,10 @@ for cryptographic operations, ensuring data confidentiality and integrity.
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional
 
 from django.conf import settings
 from django.core.exceptions import FieldError, ImproperlyConfigured
@@ -41,7 +40,14 @@ __all__ = [
 # Constants
 UNSUPPORTED_PROPERTIES = frozenset(["primary_key", "db_index", "unique"])
 DEFAULT_KEYSET = "default"
-DEFAULT_AAD_CALLBACK = lambda x: b""
+
+
+def _default_aad_callback(x: Any) -> bytes:
+    """Default AAD callback that returns empty bytes."""
+    return b""
+
+
+DEFAULT_AAD_CALLBACK = _default_aad_callback
 
 
 @dataclass(frozen=True)
@@ -202,7 +208,11 @@ class EncryptedField(models.Field):
         return None
 
     def from_db_value(
-        self, value: Any, expression: Any, connection: BaseDatabaseWrapper, *args
+        self,
+        value: Any,
+        expression: Any,
+        connection: BaseDatabaseWrapper,
+        *args,
     ) -> Any:
         """Convert database value to Python object.
 
