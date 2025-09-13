@@ -4,13 +4,14 @@
 # Testing
 pytest>=8.4.2
 pytest-django>=4.11.1
+pytest-cov>=4.1.0
 coverage>=7.10.6
 
 # Code quality
 black>=24.0.0
 isort>=5.13.0
 flake8>=7.0.0
-mypy>=1.8.0
+pyright>=1.1.405
 
 # Documentation
 sphinx>=7.2.0
