@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils.encoding import force_bytes
+
 import tink_fields as fields
 
 
@@ -41,3 +42,7 @@ class EncryptedCharWithFixedAad(models.Model):
 
 class EncryptedCharWithAlternateKeyset(models.Model):
     value = fields.EncryptedCharField(max_length=25, keyset="alternate")
+
+
+class EncryptedCharWithCleartextKeyset(models.Model):
+    value = fields.EncryptedCharField(max_length=25, keyset="cleartext_test")

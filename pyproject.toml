@@ -1,0 +1,137 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "django-tink-fields"
+version = "0.3.0"
+description = "Tink-based encrypted model fields for Django"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "BSD"}
+authors = [
+    {name = "Isaac Elbaz", email = "script3r@gmail.com"}
+]
+classifiers = [
+    "Environment :: Web Environment",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Framework :: Django",
+]
+dependencies = [
+    "Django>=5.2.6",
+    "tink>=1.12.0",
+    "protobuf>=6.32.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/script3r/django-tink-fields/"
+Repository = "https://github.com/script3r/django-tink-fields/"
+Issues = "https://github.com/script3r/django-tink-fields/issues"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4.2",
+    "pytest-django>=4.11.1",
+    "pytest-cov>=4.1.0",
+    "coverage>=7.10.6",
+    "black>=24.0.0",
+    "isort>=5.13.0",
+    "flake8>=7.0.0",
+    "mypy>=1.8.0",
+    "sphinx>=7.2.0",
+    "sphinx-rtd-theme>=2.0.0",
+]
+test = [
+    "pytest>=8.4.2",
+    "pytest-django>=4.11.1",
+    "pytest-cov>=4.1.0",
+    "coverage>=7.10.6",
+    "factory-boy>=3.3.0",
+    "freezegun>=1.4.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tink_fields*"]
+
+[tool.coverage.run]
+source = ["tink_fields"]
+omit = ["tink_fields/test/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py310']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_django = "django"
+sections = ["FUTURE", "STDLIB", "DJANGO", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "tink_fields.test.settings.sqlite"
+testpaths = ["tink_fields/test"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--cov=tink_fields",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-fail-under=80",
+]

@@ -1,7 +1,9 @@
 from datetime import date, datetime
 
-from django.db import connection, models as dj_models
+from django.db import connection
+from django.db import models as dj_models
 from django.utils.encoding import force_bytes, force_str
+
 import pytest
 
 from . import models
