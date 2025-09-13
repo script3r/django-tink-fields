@@ -1,24 +1,118 @@
-name: Django Tink Fields
+name: Tests
 
 on:
-  - push
-  - pull_request
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.7", "3.8", "3.9"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        django-version: ["5.2", "5.1", "5.0"]
+        exclude:
+          - python-version: "3.10"
+            django-version: "5.0"
+          - python-version: "3.11"
+            django-version: "5.0"
+          - python-version: "3.12"
+            django-version: "5.0"
+          - python-version: "3.13"
+            django-version: "5.0"
+          - python-version: "3.14"
+            django-version: "5.0"
+
     steps:
-      - uses: actions/checkout@v1
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install tox tox-gh-actions
-      - name: Test with tox
-        run: tox
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-test.txt
+        pip install "Django>=${{ matrix.django-version }},<$(python -c 'import sys; print(".".join(map(str, sys.version_info[:2])))').0"
+
+    - name: Run tests
+      run: |
+        pytest tink_fields/test/ -v --cov=tink_fields --cov-report=xml --cov-report=term-missing
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.14
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.14"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-dev.txt
+
+    - name: Run Black
+      run: black --check tink_fields/
+
+    - name: Run isort
+      run: isort --check-only tink_fields/
+
+    - name: Run flake8
+      run: flake8 tink_fields/
+
+    - name: Run mypy
+      run: mypy tink_fields/
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.14
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.14"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install safety bandit
+
+    - name: Run safety check
+      run: safety check
+
+    - name: Run bandit security linter
+      run: bandit -r tink_fields/ -f json -o bandit-report.json || true
+
+    - name: Upload bandit report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: bandit-report
+        path: bandit-report.json
