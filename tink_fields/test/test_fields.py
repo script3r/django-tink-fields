@@ -24,7 +24,7 @@ from . import models
         (models.EncryptedCharWithAlternateKeyset, ["foo", "bar"]),
     ],
 )
-class TestEncryptedFieldQueries(object):
+class TestEncryptedFieldQueries:
     def test_insert(self, db, model, vals):
         """Data stored in DB is actually encrypted."""
         field = model._meta.get_field("value")

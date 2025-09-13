@@ -105,7 +105,7 @@ class EncryptedField(models.Field):
     _keyset_handle: KeysetHandle
     _aad_callback: Callable[[models.Field], bytes]
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the encrypted field.
 
         Args:
@@ -146,7 +146,7 @@ class EncryptedField(models.Field):
             raise ImproperlyConfigured(
                 "Could not find `TINK_FIELDS_CONFIG` attribute in settings."
             )
-        return config
+        return config  # type: ignore[no-any-return]
 
     def _get_tink_keyset_handle(self) -> KeysetHandle:
         """Read the configuration for the requested keyset and return a keyset handle.
@@ -202,7 +202,7 @@ class EncryptedField(models.Field):
         """
         val = super().get_db_prep_save(value, connection)
         if val is not None:
-            return connection.Database.Binary(
+            return connection.Database.Binary(  # type: ignore[attr-defined]
                 self._get_aead_primitive().encrypt(
                     force_bytes(val), self._aad_callback(self)
                 )
@@ -214,7 +214,7 @@ class EncryptedField(models.Field):
         value: Any,
         expression: Any,
         connection: BaseDatabaseWrapper,
-        *args,
+        *args: Any,
     ) -> Any:
         """Convert database value to Python object.
 
@@ -239,7 +239,7 @@ class EncryptedField(models.Field):
 
     @property
     @lru_cache(maxsize=None)
-    def validators(self) -> list:
+    def validators(self) -> list[Any]:
         """Get field validators.
 
         Temporarily modifies the internal type to get appropriate validators
@@ -267,7 +267,7 @@ class EncryptedField(models.Field):
         return f"<{self.__class__.__name__}: keyset={self._keyset}>"
 
 
-def _create_lookup_class(lookup_name: str, base_lookup_class: type) -> type:
+def _create_lookup_class(lookup_name: str, base_lookup_class: type[Any]) -> type[Any]:
     """Create a lookup class that raises errors for encrypted fields.
 
     Args:
@@ -278,7 +278,7 @@ def _create_lookup_class(lookup_name: str, base_lookup_class: type) -> type:
         type: New lookup class that raises FieldError
     """
 
-    def get_prep_lookup(self) -> None:
+    def get_prep_lookup(self: Any) -> None:
         """Raise error for unsupported lookups."""
         raise FieldError(
             f"{self.lhs.field.__class__.__name__} `{self.lookup_name}` "
