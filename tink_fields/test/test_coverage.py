@@ -36,7 +36,7 @@ class TestKeysetConfigValidation:
             KeysetConfig(path="/nonexistent/path/that/does/not/exist.json")
 
     def test_keyset_config_encrypted_without_master_key(self):
-        """Test KeysetConfig validation for encrypted keyset without master_key_aead (line 44)"""
+        """Test KeysetConfig validation for encrypted keyset"""
         # Create a temporary file for the path
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             f.write('{"test": "data"}')
@@ -145,7 +145,7 @@ class TestDatabaseValueHandling:
         assert result is None
 
     def test_get_db_prep_save_with_value(self):
-        """Test get_db_prep_save with actual value (covers the 'if val is not None' branch)"""
+        """Test get_db_prep_save with actual value"""
         field = EncryptedTextField()
         result = field.get_db_prep_save("test_value", connection)
         assert result is not None
@@ -188,14 +188,15 @@ class TestDatabaseOperationsWithValues:
     """Test database operations with actual values to cover branch coverage"""
 
     def test_from_db_value_with_actual_value(self):
-        """Test from_db_value with actual encrypted value (covers the 'if value is not None' branch)"""
+        """Test from_db_value with actual encrypted value"""
         # Create a test instance and save it
         test_instance = models.EncryptedText.objects.create(value="test_value")
 
         # Get the raw value from the database
         with connection.cursor() as cursor:
             cursor.execute(
-                f"SELECT value FROM {models.EncryptedText._meta.db_table} WHERE id = %s",
+                f"SELECT value FROM {models.EncryptedText._meta.db_table} "
+                f"WHERE id = %s",
                 [test_instance.id],
             )
             raw_value = cursor.fetchone()[0]

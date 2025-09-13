@@ -118,7 +118,8 @@ class EncryptedField(models.Field):
         for prop in self._unsupported_properties:
             if prop in kwargs:
                 raise ImproperlyConfigured(
-                    f"Field `{self.__class__.__name__}` does not support property `{prop}`."
+                    f"Field `{self.__class__.__name__}` does not support "
+                    f"property `{prop}`."
                 )
 
         # Extract custom parameters
@@ -160,7 +161,8 @@ class EncryptedField(models.Field):
 
         if self._keyset not in config:
             raise ImproperlyConfigured(
-                f"Could not find configuration for keyset `{self._keyset}` in `TINK_FIELDS_CONFIG`."
+                f"Could not find configuration for keyset `{self._keyset}` "
+                f"in `TINK_FIELDS_CONFIG`."
             )
 
         keyset_config = KeysetConfig(**config[self._keyset])
@@ -279,7 +281,8 @@ def _create_lookup_class(lookup_name: str, base_lookup_class: type) -> type:
     def get_prep_lookup(self) -> None:
         """Raise error for unsupported lookups."""
         raise FieldError(
-            f"{self.lhs.field.__class__.__name__} `{self.lookup_name}` does not support lookups."
+            f"{self.lhs.field.__class__.__name__} `{self.lookup_name}` "
+            f"does not support lookups."
         )
 
     return type(
