@@ -48,3 +48,27 @@ class EncryptedCharWithAlternateKeyset(models.Model):
 
 class EncryptedCharWithCleartextKeyset(models.Model):
     value = fields.EncryptedCharField(max_length=25, keyset="cleartext_test")
+
+
+class DeterministicEncryptedText(models.Model):
+    value = fields.DeterministicEncryptedTextField(keyset="deterministic")
+
+
+class DeterministicEncryptedChar(models.Model):
+    value = fields.DeterministicEncryptedCharField(max_length=25, keyset="deterministic")
+
+
+class DeterministicEncryptedInteger(models.Model):
+    value = fields.DeterministicEncryptedIntegerField(keyset="deterministic")
+
+
+class EncryptedBinary(models.Model):
+    value = fields.EncryptedBinaryField(null=True)
+
+
+class DeterministicEncryptedEmail(models.Model):
+    value = fields.DeterministicEncryptedEmailField(keyset="deterministic")
+
+
+class DeterministicEncryptedTextNullable(models.Model):
+    value = fields.DeterministicEncryptedTextField(null=True, keyset="deterministic")
