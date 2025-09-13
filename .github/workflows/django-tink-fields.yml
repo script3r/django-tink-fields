@@ -49,10 +49,12 @@ jobs:
             pip install "Django>=5.2,<5.3"
             ;;
         esac
+        # Install the package in development mode
+        pip install -e .
 
     - name: Run tests
       run: |
-        pytest tink_fields/test/ -v --cov=tink_fields --cov-report=xml --cov-report=term-missing
+        pytest -v --cov=tink_fields --cov-report=xml --cov-report=term-missing
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
