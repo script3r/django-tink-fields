@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Optional
 
 from django.conf import settings
 from django.core.exceptions import FieldError, ImproperlyConfigured
@@ -19,7 +19,6 @@ from django.utils.encoding import force_bytes, force_str
 
 from tink import (
     JsonKeysetReader,
-    KeysetHandle,
     aead,
     cleartext_keyset_handle,
     read_keyset_handle,
