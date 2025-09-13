@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
+from typing import Any, Callable, Dict, Optional
 
 from django.conf import settings
 from django.core.exceptions import FieldError, ImproperlyConfigured
@@ -19,6 +19,7 @@ from django.utils.encoding import force_bytes, force_str
 
 from tink import (
     JsonKeysetReader,
+    KeysetHandle,
     aead,
     cleartext_keyset_handle,
     read_keyset_handle,
@@ -40,7 +41,7 @@ UNSUPPORTED_PROPERTIES = frozenset(["primary_key", "db_index", "unique"])
 DEFAULT_KEYSET = "default"
 
 
-def _default_aad_callback(x) -> bytes:
+def _default_aad_callback(x: Any) -> bytes:
     """Default AAD callback that returns empty bytes."""
     return b""
 
@@ -96,7 +97,7 @@ class EncryptedField(models.Field):
     _unsupported_properties = UNSUPPORTED_PROPERTIES
     _internal_type = "BinaryField"
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the encrypted field.
 
         Args:
@@ -175,7 +176,7 @@ class EncryptedField(models.Field):
         """
         return self._internal_type
 
-    def get_db_prep_save(self, value, connection):
+    def get_db_prep_save(self, value: Any, connection: Any) -> Any:
         """Prepare the value for saving to the database.
 
         Args:
@@ -194,11 +195,11 @@ class EncryptedField(models.Field):
 
     def from_db_value(
         self,
-        value,
-        expression,
-        connection,
-        *args,
-    ):
+        value: Any,
+        expression: Any,
+        connection: Any,
+        *args: Any,
+    ) -> Any:
         """Convert database value to Python object.
 
         Args:
@@ -216,7 +217,7 @@ class EncryptedField(models.Field):
 
     @property
     @lru_cache(maxsize=None)
-    def validators(self):
+    def validators(self) -> list[Any]:
         """Get field validators.
 
         Temporarily modifies the internal type to get appropriate validators
@@ -244,7 +245,7 @@ class EncryptedField(models.Field):
         return f"<{self.__class__.__name__}: keyset={self._keyset}>"
 
 
-def _create_lookup_class(lookup_name, base_lookup_class):
+def _create_lookup_class(lookup_name: str, base_lookup_class: type[Any]) -> type[Any]:
     """Create a lookup class that raises errors for encrypted fields.
 
     Args:
@@ -255,7 +256,7 @@ def _create_lookup_class(lookup_name, base_lookup_class):
         type: New lookup class that raises FieldError
     """
 
-    def get_prep_lookup(self):
+    def get_prep_lookup(self) -> None:
         """Raise error for unsupported lookups."""
         raise FieldError(f"{self.lhs.field.__class__.__name__} `{self.lookup_name}` " f"does not support lookups.")
 

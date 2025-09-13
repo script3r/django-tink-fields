@@ -1,0 +1,160 @@
+2025-09-13 14:16:09,623 [PID 83382] INFO Could not determine the number of Pyre workers from configuration. Auto-set the value to 4.
+2025-09-13 14:16:09,624 [PID 83382] INFO Writing arguments into /var/folders/s8/lcrfctmn5tb2th2fxmt8cdpr0000gn/T/pyre_arguments_g2x2809m.json...
+2025-09-13 14:16:09,625 [PID 83382] DEBUG Arguments:
+{
+  "source_paths": {
+    "kind": "simple",
+    "paths": [
+      "/Users/script3r/Projects/django-tink-fields/tink_fields"
+    ]
+  },
+  "search_paths": [
+    "/Users/script3r/Projects/django-tink-fields/.venv/lib/python3.13/site-packages"
+  ],
+  "excludes": [
+    "tink_fields/test"
+  ],
+  "checked_directory_allowlist": [
+    "/Users/script3r/Projects/django-tink-fields/tink_fields"
+  ],
+  "checked_directory_blocklist": [],
+  "extensions": [],
+  "log_path": "/Users/script3r/Projects/django-tink-fields/.pyre",
+  "global_root": "/Users/script3r/Projects/django-tink-fields",
+  "debug": false,
+  "python_version": {
+    "major": 3,
+    "minor": 9,
+    "micro": 23
+  },
+  "shared_memory": {},
+  "parallel": true,
+  "number_of_workers": 4,
+  "additional_logging_sections": [],
+  "show_error_traces": false,
+  "strict": true
+}
+2025-09-13 14:16:11,767 [PID 83382] DEBUG 
+2025-09-13 14:16:11,768 [PID 83382] DEBUG Usage: pyre [OPTIONS] COMMAND [ARGS]...
+2025-09-13 14:16:11,768 [PID 83382] DEBUG Try 'pyre -h' for help.
+2025-09-13 14:16:11,769 [PID 83382] DEBUG 
+2025-09-13 14:16:11,769 [PID 83382] DEBUG Error: No such command 'newcheck'.
+2025-09-13 14:16:11,821 [PID 83382] ERROR Check command exited with non-zero return code: 12.
+2025-09-13 14:16:19,816 [PID 83534] INFO No binary specified, looking for `pyre.bin` in PATH
+2025-09-13 14:16:19,816 [PID 83534] INFO Could not determine the number of Pyre workers from configuration. Auto-set the value to 4.
+2025-09-13 14:16:19,816 [PID 83534] INFO No typeshed specified, looking for it...
+2025-09-13 14:16:19,816 [PID 83534] DEBUG Could not find bundled typeshed. Try importing typeshed directly...
+2025-09-13 14:16:19,816 [PID 83534] DEBUG `import typeshed` failed.
+2025-09-13 14:16:19,816 [PID 83534] WARNING Could not find a suitable typeshed. Types for Python builtins and standard libraries may be missing!
+2025-09-13 14:16:19,818 [PID 83534] INFO Writing arguments into /var/folders/s8/lcrfctmn5tb2th2fxmt8cdpr0000gn/T/pyre_arguments_ubmcn97i.json...
+2025-09-13 14:16:19,818 [PID 83534] DEBUG Arguments:
+{
+  "source_paths": {
+    "kind": "simple",
+    "paths": [
+      "/Users/script3r/Projects/django-tink-fields/tink_fields"
+    ]
+  },
+  "search_paths": [],
+  "excludes": [
+    "tink_fields/test"
+  ],
+  "checked_directory_allowlist": [
+    "/Users/script3r/Projects/django-tink-fields/tink_fields"
+  ],
+  "checked_directory_blocklist": [],
+  "extensions": [],
+  "log_path": "/Users/script3r/Projects/django-tink-fields/.pyre",
+  "global_root": "/Users/script3r/Projects/django-tink-fields",
+  "debug": false,
+  "python_version": {
+    "major": 3,
+    "minor": 9,
+    "micro": 23
+  },
+  "shared_memory": {},
+  "parallel": true,
+  "number_of_workers": 4,
+  "additional_logging_sections": [],
+  "show_error_traces": false,
+  "strict": true
+}
+2025-09-13 14:16:23,493 [PID 83534] PERFORMANCE  Initialized shared memory (heap size: 8589934592, dep table pow: 1, hash table pow: 26): 0.000s
+2025-09-13 14:16:23,508 [PID 83534] PERFORMANCE  Initialized multiprocessing workers (workers: 4): 0.014s
+2025-09-13 14:16:23,509 [PID 83534] INFO  Building module tracker...
+2025-09-13 14:16:23,510 [PID 83534] PERFORMANCE  Module tracker built: 0.001s
+2025-09-13 14:16:23,510 [PID 83534] PERFORMANCE  Full environment built: 0.001s
+2025-09-13 14:16:23,510 [PID 83534] INFO  Collecting all definitions...
+2025-09-13 14:16:23,642 [PID 83534] PERFORMANCE  Collected definitions (defines: 75): 0.131s
+2025-09-13 14:16:23,642 [PID 83534] INFO  Checking 75 functions...
+2025-09-13 14:16:23,729 [PID 83534] INFO  Processed 10 of 75 functions
+2025-09-13 14:16:23,733 [PID 83534] INFO  Processed 20 of 75 functions
+2025-09-13 14:16:23,733 [PID 83534] INFO  Processed 30 of 75 functions
+2025-09-13 14:16:23,734 [PID 83534] INFO  Processed 40 of 75 functions
+2025-09-13 14:16:23,809 [PID 83534] INFO  Processed 50 of 75 functions
+2025-09-13 14:16:23,812 [PID 83534] INFO  Processed 60 of 75 functions
+2025-09-13 14:16:23,815 [PID 83534] INFO  Processed 70 of 75 functions
+2025-09-13 14:16:23,820 [PID 83534] INFO  Processed 75 of 75 functions
+2025-09-13 14:16:23,821 [PID 83534] PERFORMANCE  Check_TypeCheck: 0.178s
+2025-09-13 14:16:23,821 [PID 83534] MEMORY  Shared memory size post-typecheck (size: 0)
+2025-09-13 14:16:23,821 [PID 83534] INFO  Postprocessing 9 sources...
+2025-09-13 14:16:23,884 [PID 83534] INFO  Postprocessed 3 of 9 sources
+2025-09-13 14:16:23,887 [PID 83534] INFO  Postprocessed 6 of 9 sources
+2025-09-13 14:16:23,889 [PID 83534] INFO  Postprocessed 9 of 9 sources
+2025-09-13 14:16:23,889 [PID 83534] PERFORMANCE  Check_Postprocessing: 0.068s
+2025-09-13 14:16:23,889 [PID 83534] PERFORMANCE  Check (request kind: FullCheck): 0.380s
+2025-09-13 14:16:23,904 [PID 83534] ERROR Found 117 type errors!
+2025-09-13 14:16:31,386 [PID 83717] INFO No binary specified, looking for `pyre.bin` in PATH
+2025-09-13 14:16:31,386 [PID 83717] INFO Could not determine the number of Pyre workers from configuration. Auto-set the value to 4.
+2025-09-13 14:16:31,386 [PID 83717] INFO No typeshed specified, looking for it...
+2025-09-13 14:16:31,386 [PID 83717] DEBUG Could not find bundled typeshed. Try importing typeshed directly...
+2025-09-13 14:16:31,386 [PID 83717] DEBUG `import typeshed` failed.
+2025-09-13 14:16:31,386 [PID 83717] WARNING Could not find a suitable typeshed. Types for Python builtins and standard libraries may be missing!
+2025-09-13 14:16:31,387 [PID 83717] INFO Writing arguments into /var/folders/s8/lcrfctmn5tb2th2fxmt8cdpr0000gn/T/pyre_arguments_685un5bl.json...
+2025-09-13 14:16:31,387 [PID 83717] DEBUG Arguments:
+{
+  "source_paths": {
+    "kind": "simple",
+    "paths": [
+      "/Users/script3r/Projects/django-tink-fields/tink_fields"
+    ]
+  },
+  "search_paths": [],
+  "excludes": [
+    "tink_fields/test"
+  ],
+  "checked_directory_allowlist": [
+    "/Users/script3r/Projects/django-tink-fields/tink_fields"
+  ],
+  "checked_directory_blocklist": [],
+  "extensions": [],
+  "log_path": "/Users/script3r/Projects/django-tink-fields/.pyre",
+  "global_root": "/Users/script3r/Projects/django-tink-fields",
+  "debug": false,
+  "python_version": {
+    "major": 3,
+    "minor": 9,
+    "micro": 23
+  },
+  "shared_memory": {},
+  "parallel": true,
+  "number_of_workers": 4,
+  "additional_logging_sections": [
+    "-progress"
+  ],
+  "show_error_traces": false,
+  "strict": false
+}
+2025-09-13 14:16:31,441 [PID 83717] PERFORMANCE  Initialized shared memory (heap size: 8589934592, dep table pow: 1, hash table pow: 26): 0.000s
+2025-09-13 14:16:31,455 [PID 83717] PERFORMANCE  Initialized multiprocessing workers (workers: 4): 0.012s
+2025-09-13 14:16:31,455 [PID 83717] INFO  Building module tracker...
+2025-09-13 14:16:31,456 [PID 83717] PERFORMANCE  Module tracker built: 0.001s
+2025-09-13 14:16:31,456 [PID 83717] PERFORMANCE  Full environment built: 0.001s
+2025-09-13 14:16:31,456 [PID 83717] INFO  Collecting all definitions...
+2025-09-13 14:16:31,585 [PID 83717] PERFORMANCE  Collected definitions (defines: 75): 0.128s
+2025-09-13 14:16:31,585 [PID 83717] INFO  Checking 75 functions...
+2025-09-13 14:16:31,747 [PID 83717] PERFORMANCE  Check_TypeCheck: 0.162s
+2025-09-13 14:16:31,747 [PID 83717] MEMORY  Shared memory size post-typecheck (size: 0)
+2025-09-13 14:16:31,814 [PID 83717] PERFORMANCE  Check_Postprocessing: 0.066s
+2025-09-13 14:16:31,814 [PID 83717] PERFORMANCE  Check (request kind: FullCheck): 0.359s
+2025-09-13 14:16:31,828 [PID 83717] ERROR Found 49 type errors!

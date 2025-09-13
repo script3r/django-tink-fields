@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "BSD"}
 authors = [
-    {name = "Isaac Elbaz", email = "script3r@gmail.com"}
+    {name = "Isaac Elbaz", email = "script3r@gmail.com"},
 ]
 classifiers = [
     "Environment :: Web Environment",
@@ -46,6 +46,7 @@ dev = [
     "black>=24.0.0",
     "isort>=5.13.0",
     "flake8>=7.0.0",
+    "pyright>=1.1.405",
     "sphinx>=7.2.0",
     "sphinx-rtd-theme>=2.0.0",
 ]
@@ -105,6 +106,62 @@ line_length = 120
 known_django = "django"
 sections = ["FUTURE", "STDLIB", "DJANGO", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
 
+[tool.pyright]
+include = ["tink_fields"]
+exclude = ["tink_fields/test"]
+pythonVersion = "3.10"
+typeCheckingMode = "off"
+useLibraryCodeForTypes = true
+reportMissingImports = true
+reportMissingTypeStubs = false
+reportGeneralTypeIssues = false
+reportOptionalMemberAccess = false
+reportOptionalSubscript = false
+reportPrivateImportUsage = false
+reportUnknownArgumentType = false
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+reportUntypedFunctionDecorator = false
+reportUntypedClassDecorator = false
+reportUntypedBaseClass = false
+reportUntypedNamedTuple = false
+reportPrivateUsage = false
+reportConstantRedefinition = false
+reportIncompatibleMethodOverride = false
+reportIncompatibleVariableOverride = false
+reportInconsistentConstructor = false
+reportOverlappingOverload = false
+reportMissingSuperCall = false
+reportUninitializedInstanceVariable = false
+reportInvalidStringEscapeSequence = false
+reportUnknownParameterType = false
+reportUnknownLambdaType = false
+reportMissingParameterType = false
+reportMissingTypeArgument = false
+reportInvalidTypeVarUse = false
+reportCallInDefaultInitializer = false
+reportUnnecessaryIsInstance = false
+reportUnnecessaryCast = false
+reportUnnecessaryComparison = false
+reportUnnecessaryContains = false
+reportAssertAlwaysTrue = false
+reportSelfClsParameterName = false
+reportImplicitStringConcatenation = false
+reportInvalidStubStatement = false
+reportIncompleteStub = false
+reportUnsupportedDunderAll = false
+reportUnusedCallResult = false
+reportUnusedCoroutine = false
+reportUnnecessaryTypeIgnoreComment = false
+reportMatchNotExhaustive = false
+reportShadowedImports = false
+reportUnusedImport = false
+reportUnusedClass = false
+reportUnusedFunction = false
+reportUnusedVariable = false
+reportDuplicateImport = false
+reportWildcardImportFromLibrary = false
+reportAbstractUsage = false
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "tink_fields.test.settings.sqlite"

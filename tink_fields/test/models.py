@@ -1,3 +1,5 @@
+from typing import Any
+
 from django.db import models
 from django.utils.encoding import force_bytes
 
@@ -32,7 +34,7 @@ class EncryptedNullable(models.Model):
     value = fields.EncryptedIntegerField(null=True)
 
 
-def sample_aad_provider(instance):
+def sample_aad_provider(instance: Any) -> bytes:
     return force_bytes(instance.__class__.__name__)
 
 

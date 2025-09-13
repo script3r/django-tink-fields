@@ -89,6 +89,9 @@ jobs:
     - name: Run flake8
       run: flake8 tink_fields/ --max-line-length=120
 
+    - name: Run Pyright
+      run: pyright
+
 
   security:
     runs-on: ubuntu-latest
