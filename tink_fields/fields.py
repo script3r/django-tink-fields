@@ -8,7 +8,6 @@ for cryptographic operations, ensuring data confidentiality and integrity.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from django.utils.functional import cached_property
 from pathlib import Path
 from typing import Any, Optional
 
@@ -16,6 +15,7 @@ from django.conf import settings
 from django.core.exceptions import FieldError, ImproperlyConfigured
 from django.db import models
 from django.utils.encoding import force_bytes, force_str
+from django.utils.functional import cached_property
 
 from tink import (
     JsonKeysetReader,

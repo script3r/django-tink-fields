@@ -18,6 +18,13 @@ except ImportError:
     daead = None
 
 from .fields import (
+    DeterministicEncryptedCharField,
+    DeterministicEncryptedDateField,
+    DeterministicEncryptedDateTimeField,
+    DeterministicEncryptedEmailField,
+    DeterministicEncryptedField,
+    DeterministicEncryptedIntegerField,
+    DeterministicEncryptedTextField,
     EncryptedBinaryField,
     EncryptedCharField,
     EncryptedDateField,
@@ -26,13 +33,6 @@ from .fields import (
     EncryptedField,
     EncryptedIntegerField,
     EncryptedTextField,
-    DeterministicEncryptedField,
-    DeterministicEncryptedTextField,
-    DeterministicEncryptedCharField,
-    DeterministicEncryptedEmailField,
-    DeterministicEncryptedIntegerField,
-    DeterministicEncryptedDateField,
-    DeterministicEncryptedDateTimeField,
 )
 
 aead.register()

@@ -1,26 +1,14 @@
 """Tests for new features from PR #2 implementation."""
 
-import tempfile
 from unittest.mock import patch
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.db import connection, models
-from django.test import TestCase
+from django.db import connection
 
 import pytest
 
-from tink_fields.fields import (
-    EncryptedBinaryField,
-    DeterministicEncryptedField,
-    DeterministicEncryptedTextField,
-    DeterministicEncryptedCharField,
-    DeterministicEncryptedEmailField,
-    DeterministicEncryptedIntegerField,
-    DeterministicEncryptedDateField,
-    DeterministicEncryptedDateTimeField,
-    DAEAD_AVAILABLE,
-)
+from tink_fields.fields import DAEAD_AVAILABLE, DeterministicEncryptedTextField
 
 
 @pytest.mark.django_db
@@ -64,8 +52,9 @@ class TestDeterministicEncryption:
 
     def test_deterministic_text_field(self):
         """Test deterministic text field encryption."""
-        from tink_fields.test.models import DeterministicEncryptedText
         from django.db import connection
+
+        from tink_fields.test.models import DeterministicEncryptedText
 
         test_value = "test value"
 
