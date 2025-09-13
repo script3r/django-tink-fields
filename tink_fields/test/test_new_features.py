@@ -29,26 +29,21 @@ class TestEncryptedBinaryField:
 
     def test_binary_field_encryption(self):
         """Test that binary data is encrypted and decrypted correctly."""
-        # Create a test model with binary field
-        class TestModel(models.Model):
-            data = EncryptedBinaryField()
-
-            class Meta:
-                app_label = "test"
+        from tink_fields.test.models import EncryptedBinary
 
         # Test data
         test_data = b"binary data \x00\x01\x02\x03"
 
         # Create and save
-        obj = TestModel.objects.create(data=test_data)
+        obj = EncryptedBinary.objects.create(value=test_data)
         obj.refresh_from_db()
 
         # Verify decryption
-        assert obj.data == test_data
+        assert obj.value == test_data
 
         # Verify encryption in database
         with connection.cursor() as cursor:
-            cursor.execute(f"SELECT data FROM {TestModel._meta.db_table} WHERE id = %s", [obj.id])
+            cursor.execute(f"SELECT value FROM {EncryptedBinary._meta.db_table} WHERE id = %s", [obj.id])
             encrypted_data = cursor.fetchone()[0]
 
         # Should be encrypted (not equal to original)
@@ -56,15 +51,11 @@ class TestEncryptedBinaryField:
 
     def test_binary_field_none_value(self):
         """Test that None values are handled correctly."""
-        class TestModel(models.Model):
-            data = EncryptedBinaryField(null=True)
+        from tink_fields.test.models import EncryptedBinary
 
-            class Meta:
-                app_label = "test"
-
-        obj = TestModel.objects.create(data=None)
+        obj = EncryptedBinary.objects.create(value=None)
         obj.refresh_from_db()
-        assert obj.data is None
+        assert obj.value is None
 
 
 @pytest.mark.django_db
@@ -97,75 +88,63 @@ class TestDeterministicEncryption:
 
     def test_deterministic_char_field(self):
         """Test deterministic char field encryption."""
-        class TestModel(models.Model):
-            char = DeterministicEncryptedCharField(max_length=100, keyset="deterministic")
-
-            class Meta:
-                app_label = "test"
+        from tink_fields.test.models import DeterministicEncryptedChar
 
         test_value = "test char"
 
-        obj1 = TestModel.objects.create(char=test_value)
-        obj2 = TestModel.objects.create(char=test_value)
+        obj1 = DeterministicEncryptedChar.objects.create(value=test_value)
+        obj2 = DeterministicEncryptedChar.objects.create(value=test_value)
 
-        assert obj1.char == test_value
-        assert obj2.char == test_value
+        assert obj1.value == test_value
+        assert obj2.value == test_value
 
         # Verify deterministic encryption
         with connection.cursor() as cursor:
-            cursor.execute(f"SELECT char FROM {TestModel._meta.db_table} WHERE id = %s", [obj1.id])
+            cursor.execute(f"SELECT value FROM {DeterministicEncryptedChar._meta.db_table} WHERE id = %s", [obj1.id])
             encrypted1 = cursor.fetchone()[0]
-            cursor.execute(f"SELECT char FROM {TestModel._meta.db_table} WHERE id = %s", [obj2.id])
+            cursor.execute(f"SELECT value FROM {DeterministicEncryptedChar._meta.db_table} WHERE id = %s", [obj2.id])
             encrypted2 = cursor.fetchone()[0]
 
         assert encrypted1 == encrypted2
 
     def test_deterministic_integer_field(self):
         """Test deterministic integer field encryption."""
-        class TestModel(models.Model):
-            integer = DeterministicEncryptedIntegerField(keyset="deterministic")
-
-            class Meta:
-                app_label = "test"
+        from tink_fields.test.models import DeterministicEncryptedInteger
 
         test_value = 42
 
-        obj1 = TestModel.objects.create(integer=test_value)
-        obj2 = TestModel.objects.create(integer=test_value)
+        obj1 = DeterministicEncryptedInteger.objects.create(value=test_value)
+        obj2 = DeterministicEncryptedInteger.objects.create(value=test_value)
 
-        assert obj1.integer == test_value
-        assert obj2.integer == test_value
+        assert obj1.value == test_value
+        assert obj2.value == test_value
 
         # Verify deterministic encryption
         with connection.cursor() as cursor:
-            cursor.execute(f"SELECT integer FROM {TestModel._meta.db_table} WHERE id = %s", [obj1.id])
+            cursor.execute(f"SELECT value FROM {DeterministicEncryptedInteger._meta.db_table} WHERE id = %s", [obj1.id])
             encrypted1 = cursor.fetchone()[0]
-            cursor.execute(f"SELECT integer FROM {TestModel._meta.db_table} WHERE id = %s", [obj2.id])
+            cursor.execute(f"SELECT value FROM {DeterministicEncryptedInteger._meta.db_table} WHERE id = %s", [obj2.id])
             encrypted2 = cursor.fetchone()[0]
 
         assert encrypted1 == encrypted2
 
     def test_deterministic_email_field(self):
         """Test deterministic email field encryption."""
-        class TestModel(models.Model):
-            email = DeterministicEncryptedEmailField(keyset="deterministic")
-
-            class Meta:
-                app_label = "test"
+        from tink_fields.test.models import DeterministicEncryptedEmail
 
         test_value = "test@example.com"
 
-        obj1 = TestModel.objects.create(email=test_value)
-        obj2 = TestModel.objects.create(email=test_value)
+        obj1 = DeterministicEncryptedEmail.objects.create(value=test_value)
+        obj2 = DeterministicEncryptedEmail.objects.create(value=test_value)
 
-        assert obj1.email == test_value
-        assert obj2.email == test_value
+        assert obj1.value == test_value
+        assert obj2.value == test_value
 
         # Verify deterministic encryption
         with connection.cursor() as cursor:
-            cursor.execute(f"SELECT email FROM {TestModel._meta.db_table} WHERE id = %s", [obj1.id])
+            cursor.execute(f"SELECT value FROM {DeterministicEncryptedEmail._meta.db_table} WHERE id = %s", [obj1.id])
             encrypted1 = cursor.fetchone()[0]
-            cursor.execute(f"SELECT email FROM {TestModel._meta.db_table} WHERE id = %s", [obj2.id])
+            cursor.execute(f"SELECT value FROM {DeterministicEncryptedEmail._meta.db_table} WHERE id = %s", [obj2.id])
             encrypted2 = cursor.fetchone()[0]
 
         assert encrypted1 == encrypted2
@@ -177,57 +156,45 @@ class TestDeterministicLookups:
 
     def test_deterministic_exact_lookup(self):
         """Test that exact lookups work with deterministic fields."""
-        class TestModel(models.Model):
-            text = DeterministicEncryptedTextField(keyset="deterministic")
-
-            class Meta:
-                app_label = "test"
+        from tink_fields.test.models import DeterministicEncryptedText
 
         # Create test data
-        TestModel.objects.create(text="value1")
-        TestModel.objects.create(text="value2")
-        TestModel.objects.create(text="value1")  # Duplicate
+        DeterministicEncryptedText.objects.create(value="value1")
+        DeterministicEncryptedText.objects.create(value="value2")
+        DeterministicEncryptedText.objects.create(value="value1")  # Duplicate
 
         # Test exact lookup
-        results = TestModel.objects.filter(text="value1")
+        results = DeterministicEncryptedText.objects.filter(value="value1")
         assert results.count() == 2
 
         # Test exact lookup with different value
-        results = TestModel.objects.filter(text="value2")
+        results = DeterministicEncryptedText.objects.filter(value="value2")
         assert results.count() == 1
 
     def test_deterministic_isnull_lookup(self):
         """Test that isnull lookups work with deterministic fields."""
-        class TestModel(models.Model):
-            text = DeterministicEncryptedTextField(null=True, keyset="deterministic")
-
-            class Meta:
-                app_label = "test"
+        from tink_fields.test.models import DeterministicEncryptedTextNullable
 
         # Create test data
-        TestModel.objects.create(text="value1")
-        TestModel.objects.create(text=None)
+        DeterministicEncryptedTextNullable.objects.create(value="value1")
+        DeterministicEncryptedTextNullable.objects.create(value=None)
 
         # Test isnull lookup
-        results = TestModel.objects.filter(text__isnull=True)
+        results = DeterministicEncryptedTextNullable.objects.filter(value__isnull=True)
         assert results.count() == 1
 
-        results = TestModel.objects.filter(text__isnull=False)
+        results = DeterministicEncryptedTextNullable.objects.filter(value__isnull=False)
         assert results.count() == 1
 
     def test_deterministic_unsupported_lookup_raises_error(self):
         """Test that unsupported lookups raise FieldError."""
-        class TestModel(models.Model):
-            text = DeterministicEncryptedTextField(keyset="deterministic")
+        from tink_fields.test.models import DeterministicEncryptedText
 
-            class Meta:
-                app_label = "test"
-
-        TestModel.objects.create(text="value1")
+        DeterministicEncryptedText.objects.create(value="value1")
 
         # Test that unsupported lookups raise FieldError
         with pytest.raises(Exception):  # FieldError or similar
-            TestModel.objects.filter(text__contains="value").count()
+            DeterministicEncryptedText.objects.filter(value__contains="value").count()
 
 
 @pytest.mark.django_db
@@ -252,6 +219,7 @@ class TestKeysetManager:
         """Test that KeysetManager properly caches primitives."""
         from tink_fields.fields import KeysetManager
 
+        # Test regular AEAD caching with default keyset
         manager = KeysetManager("default", lambda x: b"")
 
         # Get primitive multiple times
@@ -261,15 +229,17 @@ class TestKeysetManager:
         # Should be the same instance (cached)
         assert primitive1 is primitive2
 
-        # Test deterministic primitive caching (if available)
+        # Test deterministic primitive caching with deterministic keyset
+        daead_manager = KeysetManager("deterministic", lambda x: b"")
+
         if DAEAD_AVAILABLE:
-            daead1 = manager.daead_primitive
-            daead2 = manager.daead_primitive
+            daead1 = daead_manager.daead_primitive
+            daead2 = daead_manager.daead_primitive
             assert daead1 is daead2
         else:
             # Should raise ImproperlyConfigured when not available
             with pytest.raises(ImproperlyConfigured):
-                manager.daead_primitive
+                daead_manager.daead_primitive
 
 
 @pytest.mark.django_db

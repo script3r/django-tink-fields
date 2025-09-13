@@ -27,6 +27,7 @@ from tink import (
 # Try to import deterministic AEAD, fall back gracefully if not available
 try:
     from tink import daead
+
     DAEAD_AVAILABLE = True
 except ImportError:
     DAEAD_AVAILABLE = False
@@ -129,8 +130,7 @@ class KeysetManager:
 
         if self.keyset_name not in config:
             raise ImproperlyConfigured(
-                f"Could not find configuration for keyset `{self.keyset_name}` "
-                f"in `TINK_FIELDS_CONFIG`."
+                f"Could not find configuration for keyset `{self.keyset_name}` " f"in `TINK_FIELDS_CONFIG`."
             )
 
     def _get_config(self):
@@ -161,8 +161,7 @@ class KeysetManager:
 
             if self.keyset_name not in config:
                 raise ImproperlyConfigured(
-                    f"Could not find configuration for keyset `{self.keyset_name}` "
-                    f"in `TINK_FIELDS_CONFIG`."
+                    f"Could not find configuration for keyset `{self.keyset_name}` " f"in `TINK_FIELDS_CONFIG`."
                 )
 
             keyset_config = KeysetConfig(**config[self.keyset_name])
@@ -200,7 +199,7 @@ class KeysetManager:
                 "Deterministic AEAD is not available in this version of Tink. "
                 "Please upgrade to a newer version that supports deterministic AEAD."
             )
-        
+
         try:
             return self._get_tink_keyset_handle().primitive(daead.DeterministicAead)
         except Exception as e:
@@ -402,13 +401,13 @@ def _create_deterministic_lookup_class(lookup_name: str, base_lookup_class: type
 
             # Get the field instance
             field = self.lhs.field
-            if hasattr(field, '_keyset_manager'):
+            if hasattr(field, "_keyset_manager"):
                 # Encrypt the value using the field's keyset manager
                 encrypted_value = field._keyset_manager.daead_primitive.encrypt_deterministically(
                     force_bytes(value), field._aad_callback(field)
                 )
-                # Return as a list for 'in' lookup
-                return [encrypted_value]
+                # Return the encrypted value directly
+                return encrypted_value
             else:
                 raise FieldError("Field does not have keyset manager for deterministic encryption.")
         elif self.lookup_name == "isnull":

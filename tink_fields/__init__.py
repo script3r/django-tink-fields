@@ -11,6 +11,7 @@ from tink import aead
 # Try to import deterministic AEAD, fall back gracefully if not available
 try:
     from tink import daead
+
     DAEAD_AVAILABLE = True
 except ImportError:
     DAEAD_AVAILABLE = False

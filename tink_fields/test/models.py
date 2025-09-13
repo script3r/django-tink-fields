@@ -63,4 +63,12 @@ class DeterministicEncryptedInteger(models.Model):
 
 
 class EncryptedBinary(models.Model):
-    value = fields.EncryptedBinaryField()
+    value = fields.EncryptedBinaryField(null=True)
+
+
+class DeterministicEncryptedEmail(models.Model):
+    value = fields.DeterministicEncryptedEmailField(keyset="deterministic")
+
+
+class DeterministicEncryptedTextNullable(models.Model):
+    value = fields.DeterministicEncryptedTextField(null=True, keyset="deterministic")
