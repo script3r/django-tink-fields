@@ -44,7 +44,18 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements-test.txt
-        pip install "Django>=${{ matrix.django-version }},<$(python -c 'import sys; print(".".join(map(str, sys.version_info[:2])))').0"
+        # Install specific Django version based on matrix
+        case "${{ matrix.django-version }}" in
+          "5.0")
+            pip install "Django>=5.0,<5.1"
+            ;;
+          "5.1")
+            pip install "Django>=5.1,<5.2"
+            ;;
+          "5.2")
+            pip install "Django>=5.2,<5.3"
+            ;;
+        esac
 
     - name: Run tests
       run: |
