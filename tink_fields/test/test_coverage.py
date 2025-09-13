@@ -1,15 +1,14 @@
 import os
 import tempfile
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from django.conf import settings
 from django.core.exceptions import FieldError, ImproperlyConfigured
 from django.db import connection
-from django.test import TestCase, override_settings
 
 import pytest
 
-from tink_fields.fields import EncryptedField, EncryptedTextField, KeysetConfig
+from tink_fields.fields import EncryptedTextField, KeysetConfig
 
 from . import models
 
@@ -19,16 +18,12 @@ class TestKeysetConfigValidation:
 
     def test_keyset_config_empty_path(self):
         """Test KeysetConfig validation with empty path (line 38)"""
-        with pytest.raises(
-            ImproperlyConfigured, match="Keyset path cannot be None or empty"
-        ):
+        with pytest.raises(ImproperlyConfigured, match="Keyset path cannot be None or empty"):
             KeysetConfig(path="")
 
     def test_keyset_config_none_path(self):
         """Test KeysetConfig validation with None path (line 38)"""
-        with pytest.raises(
-            ImproperlyConfigured, match="Keyset path cannot be None or empty"
-        ):
+        with pytest.raises(ImproperlyConfigured, match="Keyset path cannot be None or empty"):
             KeysetConfig(path=None)
 
     def test_keyset_config_nonexistent_path(self):
@@ -37,7 +32,7 @@ class TestKeysetConfigValidation:
             KeysetConfig(path="/nonexistent/path/that/does/not/exist.json")
 
     def test_keyset_config_encrypted_without_master_key(self):
-        """Test KeysetConfig validation for encrypted keyset without master_key_aead (line 44)"""
+        """Test KeysetConfig validation for encrypted keyset"""
         # Create a temporary file for the path
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             f.write('{"test": "data"}')
@@ -59,22 +54,19 @@ class TestFieldPropertyValidation:
     def test_primary_key_not_supported(self):
         """Test that primary_key property raises ImproperlyConfigured"""
         with pytest.raises(
-            ImproperlyConfigured, match="does not support property `primary_key`"
+            ImproperlyConfigured,
+            match="does not support property `primary_key`",
         ):
             EncryptedTextField(primary_key=True)
 
     def test_db_index_not_supported(self):
         """Test that db_index property raises ImproperlyConfigured"""
-        with pytest.raises(
-            ImproperlyConfigured, match="does not support property `db_index`"
-        ):
+        with pytest.raises(ImproperlyConfigured, match="does not support property `db_index`"):
             EncryptedTextField(db_index=True)
 
     def test_unique_not_supported(self):
         """Test that unique property raises ImproperlyConfigured"""
-        with pytest.raises(
-            ImproperlyConfigured, match="does not support property `unique`"
-        ):
+        with pytest.raises(ImproperlyConfigured, match="does not support property `unique`"):
             EncryptedTextField(unique=True)
 
 
@@ -145,7 +137,7 @@ class TestDatabaseValueHandling:
         assert result is None
 
     def test_get_db_prep_save_with_value(self):
-        """Test get_db_prep_save with actual value (covers the 'if val is not None' branch)"""
+        """Test get_db_prep_save with actual value"""
         field = EncryptedTextField()
         result = field.get_db_prep_save("test_value", connection)
         assert result is not None
@@ -188,14 +180,14 @@ class TestDatabaseOperationsWithValues:
     """Test database operations with actual values to cover branch coverage"""
 
     def test_from_db_value_with_actual_value(self):
-        """Test from_db_value with actual encrypted value (covers the 'if value is not None' branch)"""
+        """Test from_db_value with actual encrypted value"""
         # Create a test instance and save it
         test_instance = models.EncryptedText.objects.create(value="test_value")
 
         # Get the raw value from the database
         with connection.cursor() as cursor:
             cursor.execute(
-                f"SELECT value FROM {models.EncryptedText._meta.db_table} WHERE id = %s",
+                f"SELECT value FROM {models.EncryptedText._meta.db_table} " f"WHERE id = %s",
                 [test_instance.id],
             )
             raw_value = cursor.fetchone()[0]

@@ -1,7 +1,6 @@
 from datetime import date, datetime
 
 from django.db import connection
-from django.db import models as dj_models
 from django.utils.encoding import force_bytes, force_str
 
 import pytest
@@ -25,7 +24,7 @@ from . import models
         (models.EncryptedCharWithAlternateKeyset, ["foo", "bar"]),
     ],
 )
-class TestEncryptedFieldQueries(object):
+class TestEncryptedFieldQueries:
     def test_insert(self, db, model, vals):
         """Data stored in DB is actually encrypted."""
         field = model._meta.get_field("value")
@@ -34,11 +33,7 @@ class TestEncryptedFieldQueries(object):
         with connection.cursor() as cur:
             cur.execute("SELECT value FROM %s" % model._meta.db_table)
             data = [
-                force_str(
-                    field._get_aead_primitive().decrypt(
-                        force_bytes(r[0]), aad_callback(field)
-                    )
-                )
+                force_str(field._get_aead_primitive().decrypt(force_bytes(r[0]), aad_callback(field)))
                 for r in cur.fetchall()
             ]
 

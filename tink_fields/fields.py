@@ -7,21 +7,18 @@ for cryptographic operations, ensuring data confidentiality and integrity.
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Optional
 
 from django.conf import settings
 from django.core.exceptions import FieldError, ImproperlyConfigured
 from django.db import models
-from django.db.backends.base.base import BaseDatabaseWrapper
 from django.utils.encoding import force_bytes, force_str
 
 from tink import (
     JsonKeysetReader,
-    KeysetHandle,
     aead,
     cleartext_keyset_handle,
     read_keyset_handle,
@@ -41,7 +38,14 @@ __all__ = [
 # Constants
 UNSUPPORTED_PROPERTIES = frozenset(["primary_key", "db_index", "unique"])
 DEFAULT_KEYSET = "default"
-DEFAULT_AAD_CALLBACK = lambda x: b""
+
+
+def _default_aad_callback(x: Any) -> bytes:
+    """Default AAD callback that returns empty bytes."""
+    return b""
+
+
+DEFAULT_AAD_CALLBACK = _default_aad_callback
 
 
 @dataclass(frozen=True)
@@ -58,11 +62,11 @@ class KeysetConfig:
     master_key_aead: Optional[aead.Aead] = None
     cleartext: bool = False
 
-    def __post_init__(self) -> None:
+    def __post_init__(self):
         """Validate the keyset configuration after initialization."""
         self.validate()
 
-    def validate(self) -> None:
+    def validate(self):
         """Validate the keyset configuration.
 
         Raises:
@@ -75,9 +79,7 @@ class KeysetConfig:
             raise ImproperlyConfigured(f"Keyset {self.path} does not exist.")
 
         if not self.cleartext and self.master_key_aead is None:
-            raise ImproperlyConfigured(
-                "Encrypted keysets must specify `master_key_aead`."
-            )
+            raise ImproperlyConfigured("Encrypted keysets must specify `master_key_aead`.")
 
 
 class EncryptedField(models.Field):
@@ -94,12 +96,7 @@ class EncryptedField(models.Field):
     _unsupported_properties = UNSUPPORTED_PROPERTIES
     _internal_type = "BinaryField"
 
-    # Type hints for instance attributes
-    _keyset: str
-    _keyset_handle: KeysetHandle
-    _aad_callback: Callable[[models.Field], bytes]
-
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the encrypted field.
 
         Args:
@@ -111,9 +108,7 @@ class EncryptedField(models.Field):
         # Validate unsupported properties
         for prop in self._unsupported_properties:
             if prop in kwargs:
-                raise ImproperlyConfigured(
-                    f"Field `{self.__class__.__name__}` does not support property `{prop}`."
-                )
+                raise ImproperlyConfigured(f"Field `{self.__class__.__name__}` does not support " f"property `{prop}`.")
 
         # Extract custom parameters
         self._keyset = kwargs.pop("keyset", DEFAULT_KEYSET)
@@ -125,7 +120,7 @@ class EncryptedField(models.Field):
         # Call parent constructor
         super().__init__(*args, **kwargs)
 
-    def _get_config(self) -> Dict[str, Any]:
+    def _get_config(self):
         """Get the Tink fields configuration from Django settings.
 
         Returns:
@@ -136,12 +131,10 @@ class EncryptedField(models.Field):
         """
         config = getattr(settings, "TINK_FIELDS_CONFIG", None)
         if config is None:
-            raise ImproperlyConfigured(
-                "Could not find `TINK_FIELDS_CONFIG` attribute in settings."
-            )
+            raise ImproperlyConfigured("Could not find `TINK_FIELDS_CONFIG` attribute in settings.")
         return config
 
-    def _get_tink_keyset_handle(self) -> KeysetHandle:
+    def _get_tink_keyset_handle(self):
         """Read the configuration for the requested keyset and return a keyset handle.
 
         Returns:
@@ -154,7 +147,7 @@ class EncryptedField(models.Field):
 
         if self._keyset not in config:
             raise ImproperlyConfigured(
-                f"Could not find configuration for keyset `{self._keyset}` in `TINK_FIELDS_CONFIG`."
+                f"Could not find configuration for keyset `{self._keyset}` " f"in `TINK_FIELDS_CONFIG`."
             )
 
         keyset_config = KeysetConfig(**config[self._keyset])
@@ -166,7 +159,7 @@ class EncryptedField(models.Field):
             return read_keyset_handle(reader, keyset_config.master_key_aead)
 
     @lru_cache(maxsize=None)
-    def _get_aead_primitive(self) -> aead.Aead:
+    def _get_aead_primitive(self):
         """Get the AEAD primitive for encryption/decryption operations.
 
         Returns:
@@ -174,7 +167,7 @@ class EncryptedField(models.Field):
         """
         return self._keyset_handle.primitive(aead.Aead)
 
-    def get_internal_type(self) -> str:
+    def get_internal_type(self):
         """Return the internal Django field type.
 
         Returns:
@@ -182,7 +175,7 @@ class EncryptedField(models.Field):
         """
         return self._internal_type
 
-    def get_db_prep_save(self, value: Any, connection: BaseDatabaseWrapper) -> Any:
+    def get_db_prep_save(self, value: Any, connection: Any) -> Any:
         """Prepare the value for saving to the database.
 
         Args:
@@ -195,14 +188,16 @@ class EncryptedField(models.Field):
         val = super().get_db_prep_save(value, connection)
         if val is not None:
             return connection.Database.Binary(
-                self._get_aead_primitive().encrypt(
-                    force_bytes(val), self._aad_callback(self)
-                )
+                self._get_aead_primitive().encrypt(force_bytes(val), self._aad_callback(self))
             )
         return None
 
     def from_db_value(
-        self, value: Any, expression: Any, connection: BaseDatabaseWrapper, *args
+        self,
+        value: Any,
+        expression: Any,
+        connection: Any,
+        *args: Any,
     ) -> Any:
         """Convert database value to Python object.
 
@@ -216,18 +211,12 @@ class EncryptedField(models.Field):
             Decrypted and converted Python object, or None if value is None
         """
         if value is not None:
-            return self.to_python(
-                force_str(
-                    self._get_aead_primitive().decrypt(
-                        bytes(value), self._aad_callback(self)
-                    )
-                )
-            )
+            return self.to_python(force_str(self._get_aead_primitive().decrypt(bytes(value), self._aad_callback(self))))
         return None
 
     @property
     @lru_cache(maxsize=None)
-    def validators(self) -> list:
+    def validators(self) -> list[Any]:
         """Get field validators.
 
         Temporarily modifies the internal type to get appropriate validators
@@ -246,7 +235,7 @@ class EncryptedField(models.Field):
         finally:
             self.__dict__["_internal_type"] = original_internal_type
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         """Return string representation of the field.
 
         Returns:
@@ -255,7 +244,7 @@ class EncryptedField(models.Field):
         return f"<{self.__class__.__name__}: keyset={self._keyset}>"
 
 
-def _create_lookup_class(lookup_name: str, base_lookup_class: type) -> type:
+def _create_lookup_class(lookup_name: str, base_lookup_class: type[Any]) -> type[Any]:
     """Create a lookup class that raises errors for encrypted fields.
 
     Args:
@@ -268,9 +257,7 @@ def _create_lookup_class(lookup_name: str, base_lookup_class: type) -> type:
 
     def get_prep_lookup(self) -> None:
         """Raise error for unsupported lookups."""
-        raise FieldError(
-            f"{self.lhs.field.__class__.__name__} `{self.lookup_name}` does not support lookups."
-        )
+        raise FieldError(f"{self.lhs.field.__class__.__name__} `{self.lookup_name}` " f"does not support lookups.")
 
     return type(
         f"EncryptedField{lookup_name}",
@@ -279,7 +266,7 @@ def _create_lookup_class(lookup_name: str, base_lookup_class: type) -> type:
     )
 
 
-def _register_lookup_classes() -> None:
+def _register_lookup_classes():
     """Register lookup classes for encrypted fields."""
     for name, lookup in models.Field.class_lookups.items():
         if name != "isnull":
