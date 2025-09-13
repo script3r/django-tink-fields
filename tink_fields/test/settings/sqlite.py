@@ -30,4 +30,8 @@ TINK_FIELDS_CONFIG = {
         "cleartext": True,
         "path": os.path.join(HERE, "../test_cleartext_keyset.json"),
     },
+    "deterministic": {
+        "cleartext": True,
+        "path": os.path.join(HERE, "../test_deterministic_keyset.json"),
+    },
 }

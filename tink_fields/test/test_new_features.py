@@ -68,33 +68,29 @@ class TestEncryptedBinaryField:
 
 
 @pytest.mark.django_db
-@pytest.mark.skipif(not DAEAD_AVAILABLE, reason="Deterministic AEAD not available in this Tink version")
 class TestDeterministicEncryption:
     """Test cases for deterministic encryption fields."""
 
     def test_deterministic_text_field(self):
         """Test deterministic text field encryption."""
-        class TestModel(models.Model):
-            text = DeterministicEncryptedTextField()
-
-            class Meta:
-                app_label = "test"
+        from tink_fields.test.models import DeterministicEncryptedText
+        from django.db import connection
 
         test_value = "test value"
 
         # Create two objects with same value
-        obj1 = TestModel.objects.create(text=test_value)
-        obj2 = TestModel.objects.create(text=test_value)
+        obj1 = DeterministicEncryptedText.objects.create(value=test_value)
+        obj2 = DeterministicEncryptedText.objects.create(value=test_value)
 
         # Both should decrypt to same value
-        assert obj1.text == test_value
-        assert obj2.text == test_value
+        assert obj1.value == test_value
+        assert obj2.value == test_value
 
         # But encrypted values should be identical (deterministic)
         with connection.cursor() as cursor:
-            cursor.execute(f"SELECT text FROM {TestModel._meta.db_table} WHERE id = %s", [obj1.id])
+            cursor.execute(f"SELECT value FROM {DeterministicEncryptedText._meta.db_table} WHERE id = %s", [obj1.id])
             encrypted1 = cursor.fetchone()[0]
-            cursor.execute(f"SELECT text FROM {TestModel._meta.db_table} WHERE id = %s", [obj2.id])
+            cursor.execute(f"SELECT value FROM {DeterministicEncryptedText._meta.db_table} WHERE id = %s", [obj2.id])
             encrypted2 = cursor.fetchone()[0]
 
         assert encrypted1 == encrypted2
@@ -102,7 +98,7 @@ class TestDeterministicEncryption:
     def test_deterministic_char_field(self):
         """Test deterministic char field encryption."""
         class TestModel(models.Model):
-            char = DeterministicEncryptedCharField(max_length=100)
+            char = DeterministicEncryptedCharField(max_length=100, keyset="deterministic")
 
             class Meta:
                 app_label = "test"
@@ -127,7 +123,7 @@ class TestDeterministicEncryption:
     def test_deterministic_integer_field(self):
         """Test deterministic integer field encryption."""
         class TestModel(models.Model):
-            integer = DeterministicEncryptedIntegerField()
+            integer = DeterministicEncryptedIntegerField(keyset="deterministic")
 
             class Meta:
                 app_label = "test"
@@ -152,7 +148,7 @@ class TestDeterministicEncryption:
     def test_deterministic_email_field(self):
         """Test deterministic email field encryption."""
         class TestModel(models.Model):
-            email = DeterministicEncryptedEmailField()
+            email = DeterministicEncryptedEmailField(keyset="deterministic")
 
             class Meta:
                 app_label = "test"
@@ -176,14 +172,13 @@ class TestDeterministicEncryption:
 
 
 @pytest.mark.django_db
-@pytest.mark.skipif(not DAEAD_AVAILABLE, reason="Deterministic AEAD not available in this Tink version")
 class TestDeterministicLookups:
     """Test cases for deterministic field lookups."""
 
     def test_deterministic_exact_lookup(self):
         """Test that exact lookups work with deterministic fields."""
         class TestModel(models.Model):
-            text = DeterministicEncryptedTextField()
+            text = DeterministicEncryptedTextField(keyset="deterministic")
 
             class Meta:
                 app_label = "test"
@@ -204,7 +199,7 @@ class TestDeterministicLookups:
     def test_deterministic_isnull_lookup(self):
         """Test that isnull lookups work with deterministic fields."""
         class TestModel(models.Model):
-            text = DeterministicEncryptedTextField(null=True)
+            text = DeterministicEncryptedTextField(null=True, keyset="deterministic")
 
             class Meta:
                 app_label = "test"
@@ -223,7 +218,7 @@ class TestDeterministicLookups:
     def test_deterministic_unsupported_lookup_raises_error(self):
         """Test that unsupported lookups raise FieldError."""
         class TestModel(models.Model):
-            text = DeterministicEncryptedTextField()
+            text = DeterministicEncryptedTextField(keyset="deterministic")
 
             class Meta:
                 app_label = "test"

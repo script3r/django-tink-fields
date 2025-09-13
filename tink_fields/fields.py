@@ -517,7 +517,8 @@ class DeterministicEncryptedField(EncryptedField):
         Returns:
             Binary object containing deterministically encrypted data, or None if value is None
         """
-        val = super().get_db_prep_save(value, connection)
+        # Call the grandparent's get_db_prep_save to avoid using regular AEAD
+        val = super(EncryptedField, self).get_db_prep_save(value, connection)
         if val is not None:
             return connection.Database.Binary(
                 self._keyset_manager.daead_primitive.encrypt_deterministically(
