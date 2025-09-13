@@ -87,7 +87,7 @@ jobs:
       run: isort --check-only tink_fields/
 
     - name: Run flake8
-      run: flake8 tink_fields/ --max-line-length=88
+      run: flake8 tink_fields/ --max-line-length=120
 
     - name: Run mypy
       run: mypy tink_fields/

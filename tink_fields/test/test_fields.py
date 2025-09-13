@@ -33,11 +33,7 @@ class TestEncryptedFieldQueries:
         with connection.cursor() as cur:
             cur.execute("SELECT value FROM %s" % model._meta.db_table)
             data = [
-                force_str(
-                    field._get_aead_primitive().decrypt(
-                        force_bytes(r[0]), aad_callback(field)
-                    )
-                )
+                force_str(field._get_aead_primitive().decrypt(force_bytes(r[0]), aad_callback(field)))
                 for r in cur.fetchall()
             ]
 

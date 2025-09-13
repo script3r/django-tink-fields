@@ -81,9 +81,7 @@ class KeysetConfig:
             raise ImproperlyConfigured(f"Keyset {self.path} does not exist.")
 
         if not self.cleartext and self.master_key_aead is None:
-            raise ImproperlyConfigured(
-                "Encrypted keysets must specify `master_key_aead`."
-            )
+            raise ImproperlyConfigured("Encrypted keysets must specify `master_key_aead`.")
 
 
 class EncryptedField(models.Field):
@@ -117,10 +115,7 @@ class EncryptedField(models.Field):
         # Validate unsupported properties
         for prop in self._unsupported_properties:
             if prop in kwargs:
-                raise ImproperlyConfigured(
-                    f"Field `{self.__class__.__name__}` does not support "
-                    f"property `{prop}`."
-                )
+                raise ImproperlyConfigured(f"Field `{self.__class__.__name__}` does not support " f"property `{prop}`.")
 
         # Extract custom parameters
         self._keyset = kwargs.pop("keyset", DEFAULT_KEYSET)
@@ -143,9 +138,7 @@ class EncryptedField(models.Field):
         """
         config = getattr(settings, "TINK_FIELDS_CONFIG", None)
         if config is None:
-            raise ImproperlyConfigured(
-                "Could not find `TINK_FIELDS_CONFIG` attribute in settings."
-            )
+            raise ImproperlyConfigured("Could not find `TINK_FIELDS_CONFIG` attribute in settings.")
         return config  # type: ignore[no-any-return]
 
     def _get_tink_keyset_handle(self) -> KeysetHandle:
@@ -161,8 +154,7 @@ class EncryptedField(models.Field):
 
         if self._keyset not in config:
             raise ImproperlyConfigured(
-                f"Could not find configuration for keyset `{self._keyset}` "
-                f"in `TINK_FIELDS_CONFIG`."
+                f"Could not find configuration for keyset `{self._keyset}` " f"in `TINK_FIELDS_CONFIG`."
             )
 
         keyset_config = KeysetConfig(**config[self._keyset])
@@ -203,9 +195,7 @@ class EncryptedField(models.Field):
         val = super().get_db_prep_save(value, connection)
         if val is not None:
             return connection.Database.Binary(  # type: ignore[attr-defined]
-                self._get_aead_primitive().encrypt(
-                    force_bytes(val), self._aad_callback(self)
-                )
+                self._get_aead_primitive().encrypt(force_bytes(val), self._aad_callback(self))
             )
         return None
 
@@ -228,13 +218,7 @@ class EncryptedField(models.Field):
             Decrypted and converted Python object, or None if value is None
         """
         if value is not None:
-            return self.to_python(
-                force_str(
-                    self._get_aead_primitive().decrypt(
-                        bytes(value), self._aad_callback(self)
-                    )
-                )
-            )
+            return self.to_python(force_str(self._get_aead_primitive().decrypt(bytes(value), self._aad_callback(self))))
         return None
 
     @property
@@ -280,10 +264,7 @@ def _create_lookup_class(lookup_name: str, base_lookup_class: type[Any]) -> type
 
     def get_prep_lookup(self: Any) -> None:
         """Raise error for unsupported lookups."""
-        raise FieldError(
-            f"{self.lhs.field.__class__.__name__} `{self.lookup_name}` "
-            f"does not support lookups."
-        )
+        raise FieldError(f"{self.lhs.field.__class__.__name__} `{self.lookup_name}` " f"does not support lookups.")
 
     return type(
         f"EncryptedField{lookup_name}",

@@ -18,16 +18,12 @@ class TestKeysetConfigValidation:
 
     def test_keyset_config_empty_path(self):
         """Test KeysetConfig validation with empty path (line 38)"""
-        with pytest.raises(
-            ImproperlyConfigured, match="Keyset path cannot be None or empty"
-        ):
+        with pytest.raises(ImproperlyConfigured, match="Keyset path cannot be None or empty"):
             KeysetConfig(path="")
 
     def test_keyset_config_none_path(self):
         """Test KeysetConfig validation with None path (line 38)"""
-        with pytest.raises(
-            ImproperlyConfigured, match="Keyset path cannot be None or empty"
-        ):
+        with pytest.raises(ImproperlyConfigured, match="Keyset path cannot be None or empty"):
             KeysetConfig(path=None)  # type: ignore[arg-type]
 
     def test_keyset_config_nonexistent_path(self):
@@ -65,16 +61,12 @@ class TestFieldPropertyValidation:
 
     def test_db_index_not_supported(self):
         """Test that db_index property raises ImproperlyConfigured"""
-        with pytest.raises(
-            ImproperlyConfigured, match="does not support property `db_index`"
-        ):
+        with pytest.raises(ImproperlyConfigured, match="does not support property `db_index`"):
             EncryptedTextField(db_index=True)
 
     def test_unique_not_supported(self):
         """Test that unique property raises ImproperlyConfigured"""
-        with pytest.raises(
-            ImproperlyConfigured, match="does not support property `unique`"
-        ):
+        with pytest.raises(ImproperlyConfigured, match="does not support property `unique`"):
             EncryptedTextField(unique=True)
 
 
@@ -195,8 +187,7 @@ class TestDatabaseOperationsWithValues:
         # Get the raw value from the database
         with connection.cursor() as cursor:
             cursor.execute(
-                f"SELECT value FROM {models.EncryptedText._meta.db_table} "
-                f"WHERE id = %s",
+                f"SELECT value FROM {models.EncryptedText._meta.db_table} " f"WHERE id = %s",
                 [test_instance.id],  # type: ignore[attr-defined]
             )
             raw_value = cursor.fetchone()[0]
