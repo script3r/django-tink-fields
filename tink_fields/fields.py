@@ -33,12 +33,30 @@ except ImportError:
     DAEAD_AVAILABLE = False
     daead = None
 
+
+def _register_tink_primitives() -> None:
+    """Register Tink primitives so direct module imports are safe."""
+    aead.register()
+    if DAEAD_AVAILABLE:
+        daead.register()
+
+
+_register_tink_primitives()
+
 __all__ = [
     "EncryptedField",
     "EncryptedTextField",
     "EncryptedCharField",
     "EncryptedEmailField",
+    "EncryptedBooleanField",
     "EncryptedIntegerField",
+    "EncryptedPositiveIntegerField",
+    "EncryptedFloatField",
+    "EncryptedDecimalField",
+    "EncryptedUUIDField",
+    "EncryptedJSONField",
+    "EncryptedURLField",
+    "EncryptedSlugField",
     "EncryptedDateField",
     "EncryptedDateTimeField",
     "EncryptedBinaryField",
@@ -47,6 +65,8 @@ __all__ = [
     "DeterministicEncryptedCharField",
     "DeterministicEncryptedEmailField",
     "DeterministicEncryptedIntegerField",
+    "DeterministicEncryptedUUIDField",
+    "DeterministicEncryptedBooleanField",
     "DeterministicEncryptedDateField",
     "DeterministicEncryptedDateTimeField",
 ]
@@ -105,6 +125,8 @@ class KeysetManager:
     This class provides a centralized way to manage keyset handles and
     their associated primitives, with proper caching to avoid memory leaks.
     """
+
+    _handle_cache: dict[tuple[str, str, bool, int], Any] = {}
 
     def __init__(self, keyset_name: str, aad_callback: Any):
         """Initialize the keyset manager.
@@ -165,13 +187,23 @@ class KeysetManager:
                 )
 
             keyset_config = KeysetConfig(**config[self.keyset_name])
-
-            with open(keyset_config.path, "r", encoding="utf-8") as f:
-                reader = JsonKeysetReader(f.read())
-                if keyset_config.cleartext:
-                    self._keyset_handle = cleartext_keyset_handle.read(reader)
-                else:
-                    self._keyset_handle = read_keyset_handle(reader, keyset_config.master_key_aead)
+            cache_key = (
+                self.keyset_name,
+                keyset_config.path,
+                keyset_config.cleartext,
+                id(keyset_config.master_key_aead) if keyset_config.master_key_aead is not None else 0,
+            )
+            cached_handle = self._handle_cache.get(cache_key)
+            if cached_handle is not None:
+                self._keyset_handle = cached_handle
+            else:
+                with open(keyset_config.path, "r", encoding="utf-8") as f:
+                    reader = JsonKeysetReader(f.read())
+                    if keyset_config.cleartext:
+                        self._keyset_handle = cleartext_keyset_handle.read(reader)
+                    else:
+                        self._keyset_handle = read_keyset_handle(reader, keyset_config.master_key_aead)
+                self._handle_cache[cache_key] = self._keyset_handle
 
         return self._keyset_handle
 
@@ -380,8 +412,8 @@ def _create_lookup_class(lookup_name: str, base_lookup_class: type[Any]) -> type
 def _create_deterministic_lookup_class(lookup_name: str, base_lookup_class: type[Any]) -> type[Any]:
     """Create a lookup class for deterministic encrypted fields.
 
-    For deterministic fields, we support exact lookups by converting them to
-    'in' lookups with all possible encrypted values.
+    For deterministic fields, we support exact lookups by encrypting the
+    prepared value and comparing ciphertexts.
 
     Args:
         lookup_name: Name of the lookup operation
@@ -402,9 +434,12 @@ def _create_deterministic_lookup_class(lookup_name: str, base_lookup_class: type
             # Get the field instance
             field = self.lhs.field
             if hasattr(field, "_keyset_manager"):
+                prepared_value = field.get_prep_value(value)
+                if prepared_value is None:
+                    return None
                 # Encrypt the value using the field's keyset manager
                 encrypted_value = field._keyset_manager.daead_primitive.encrypt_deterministically(
-                    force_bytes(value), field._aad_callback(field)
+                    force_bytes(prepared_value), field._aad_callback(field)
                 )
                 # Return the encrypted value directly
                 return encrypted_value
@@ -456,8 +491,76 @@ class EncryptedEmailField(EncryptedField, models.EmailField):
     pass
 
 
+class EncryptedBooleanField(EncryptedField, models.BooleanField):
+    """Encrypted boolean field."""
+
+    pass
+
+
 class EncryptedIntegerField(EncryptedField, models.IntegerField):
     """Encrypted integer field."""
+
+    pass
+
+
+class EncryptedPositiveIntegerField(EncryptedField, models.PositiveIntegerField):
+    """Encrypted positive integer field."""
+
+    pass
+
+
+class EncryptedFloatField(EncryptedField, models.FloatField):
+    """Encrypted float field."""
+
+    pass
+
+
+class EncryptedDecimalField(EncryptedField, models.DecimalField):
+    """Encrypted decimal field."""
+
+    pass
+
+
+class EncryptedUUIDField(EncryptedField, models.UUIDField):
+    """Encrypted UUID field."""
+
+    pass
+
+
+class EncryptedJSONField(EncryptedField, models.JSONField):
+    """Encrypted JSON field."""
+
+    def get_db_prep_save(self, value: Any, connection: Any) -> Any:
+        """Prepare JSON values using JSONField semantics, then encrypt."""
+        val = models.JSONField.get_db_prep_save(self, value, connection)
+        if val is not None:
+            return connection.Database.Binary(
+                self._keyset_manager.aead_primitive.encrypt(force_bytes(val), self._aad_callback(self))
+            )
+        return None
+
+    def from_db_value(
+        self,
+        value: Any,
+        expression: Any,
+        connection: Any,
+        *args: Any,
+    ) -> Any:
+        """Convert database value to Python object with JSON decoding."""
+        if value is not None:
+            decrypted = self._keyset_manager.aead_primitive.decrypt(bytes(value), self._aad_callback(self))
+            return models.JSONField.from_db_value(self, force_str(decrypted), expression, connection)
+        return None
+
+
+class EncryptedURLField(EncryptedField, models.URLField):
+    """Encrypted URL field."""
+
+    pass
+
+
+class EncryptedSlugField(EncryptedField, models.SlugField):
+    """Encrypted slug field."""
 
     pass
 
@@ -573,6 +676,18 @@ class DeterministicEncryptedEmailField(DeterministicEncryptedField, models.Email
 
 class DeterministicEncryptedIntegerField(DeterministicEncryptedField, models.IntegerField):
     """Deterministic encrypted integer field."""
+
+    pass
+
+
+class DeterministicEncryptedUUIDField(DeterministicEncryptedField, models.UUIDField):
+    """Deterministic encrypted UUID field."""
+
+    pass
+
+
+class DeterministicEncryptedBooleanField(DeterministicEncryptedField, models.BooleanField):
+    """Deterministic encrypted boolean field."""
 
     pass
 

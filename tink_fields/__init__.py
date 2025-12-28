@@ -25,27 +25,45 @@ from .fields import (
     DeterministicEncryptedField,
     DeterministicEncryptedIntegerField,
     DeterministicEncryptedTextField,
+    DeterministicEncryptedUUIDField,
+    DeterministicEncryptedBooleanField,
     EncryptedBinaryField,
+    EncryptedBooleanField,
     EncryptedCharField,
     EncryptedDateField,
     EncryptedDateTimeField,
+    EncryptedDecimalField,
     EncryptedEmailField,
     EncryptedField,
+    EncryptedFloatField,
+    EncryptedJSONField,
     EncryptedIntegerField,
+    EncryptedPositiveIntegerField,
+    EncryptedSlugField,
     EncryptedTextField,
+    EncryptedURLField,
+    EncryptedUUIDField,
 )
 
 aead.register()
 if DAEAD_AVAILABLE:
     daead.register()
 
-__version__ = "0.3.0"
+__version__ = "0.3.2"
 __all__ = [
     "EncryptedField",
     "EncryptedTextField",
     "EncryptedCharField",
     "EncryptedEmailField",
+    "EncryptedBooleanField",
     "EncryptedIntegerField",
+    "EncryptedPositiveIntegerField",
+    "EncryptedFloatField",
+    "EncryptedDecimalField",
+    "EncryptedUUIDField",
+    "EncryptedJSONField",
+    "EncryptedURLField",
+    "EncryptedSlugField",
     "EncryptedDateField",
     "EncryptedDateTimeField",
     "EncryptedBinaryField",
@@ -54,6 +72,8 @@ __all__ = [
     "DeterministicEncryptedCharField",
     "DeterministicEncryptedEmailField",
     "DeterministicEncryptedIntegerField",
+    "DeterministicEncryptedUUIDField",
+    "DeterministicEncryptedBooleanField",
     "DeterministicEncryptedDateField",
     "DeterministicEncryptedDateTimeField",
 ]

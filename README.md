@@ -7,7 +7,9 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Tests](https://github.com/script3r/django-tink-fields/workflows/Tests/badge.svg)](https://github.com/script3r/django-tink-fields/actions)
 
-**Django Tink Fields** provides encrypted Django model fields using [Google Tink](https://developers.google.com/tink) cryptographic library. This package offers field-level encryption for Django models with strong security guarantees and easy integration.
+**Django Tink Fields** is a simple, production-ready way to encrypt Django model fields using the [Google Tink](https://developers.google.com/tink) cryptographic library. It offers drop-in encrypted field types for Django models, so you can protect sensitive data with minimal code changes.
+
+Keywords: Django field encryption, encrypted model fields, Google Tink, AEAD, deterministic encryption.
 
 ## ✨ Features
 
@@ -75,9 +77,31 @@ class UserProfile(models.Model):
 | `EncryptedCharField` | `CharField` | Encrypted character field |
 | `EncryptedTextField` | `TextField` | Encrypted text field |
 | `EncryptedEmailField` | `EmailField` | Encrypted email field |
+| `EncryptedBooleanField` | `BooleanField` | Encrypted boolean field |
 | `EncryptedIntegerField` | `IntegerField` | Encrypted integer field |
+| `EncryptedPositiveIntegerField` | `PositiveIntegerField` | Encrypted positive integer field |
+| `EncryptedFloatField` | `FloatField` | Encrypted float field |
+| `EncryptedDecimalField` | `DecimalField` | Encrypted decimal field |
+| `EncryptedUUIDField` | `UUIDField` | Encrypted UUID field |
+| `EncryptedJSONField` | `JSONField` | Encrypted JSON field |
+| `EncryptedURLField` | `URLField` | Encrypted URL field |
+| `EncryptedSlugField` | `SlugField` | Encrypted slug field |
 | `EncryptedDateField` | `DateField` | Encrypted date field |
 | `EncryptedDateTimeField` | `DateTimeField` | Encrypted datetime field |
+| `EncryptedBinaryField` | `BinaryField` | Encrypted binary field |
+
+### Deterministic Field Types
+
+| Field Type | Django Equivalent | Description |
+|------------|-------------------|-------------|
+| `DeterministicEncryptedTextField` | `TextField` | Deterministic encrypted text field |
+| `DeterministicEncryptedCharField` | `CharField` | Deterministic encrypted character field |
+| `DeterministicEncryptedEmailField` | `EmailField` | Deterministic encrypted email field |
+| `DeterministicEncryptedIntegerField` | `IntegerField` | Deterministic encrypted integer field |
+| `DeterministicEncryptedUUIDField` | `UUIDField` | Deterministic encrypted UUID field |
+| `DeterministicEncryptedBooleanField` | `BooleanField` | Deterministic encrypted boolean field |
+| `DeterministicEncryptedDateField` | `DateField` | Deterministic encrypted date field |
+| `DeterministicEncryptedDateTimeField` | `DateTimeField` | Deterministic encrypted datetime field |
 
 ### Configuration Options
 
@@ -234,6 +258,16 @@ pytest tink_fields/test/test_fields.py  # Basic functionality
 pytest tink_fields/test/test_coverage.py  # Edge cases
 ```
 
+### Integration Test Harness
+
+This repo ships a minimal Django project under `example_project/` that exercises
+real model usage and verifies ciphertext at rest, tamper detection, deterministic
+lookups, and AAD behavior:
+
+```bash
+pytest -c example_project/pytest.ini example_project/example_app/tests
+```
+
 ## 🛠️ Development
 
 ### Setup Development Environment
@@ -307,7 +341,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ## 📝 Changelog
 
-### v0.3.0 (Latest)
+### v0.3.2 (Latest)
 - ✨ Modernized codebase with Python 3.10+ support
 - 🔧 Updated dependencies to latest versions
 - 📊 Improved test coverage to 97%+
@@ -320,7 +354,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ## 📄 License
 
-This project is licensed under the BSD License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the BSD License - see the [LICENSE.txt](LICENSE.txt) file for details.
 
 ## 🙏 Acknowledgments
 

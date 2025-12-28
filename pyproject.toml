@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "django-tink-fields"
-version = "0.3.1"
+version = "0.3.2"
 description = "Tink-based encrypted model fields for Django"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -27,9 +27,9 @@ classifiers = [
     "Framework :: Django",
 ]
 dependencies = [
-    "Django>=5.2.6",
-    "tink>=1.12.0",
-    "protobuf>=6.32.1",
+    "Django>=6.0",
+    "tink>=1.13.0",
+    "protobuf>=6.33.2",
 ]
 
 [project.urls]
@@ -39,24 +39,24 @@ Issues = "https://github.com/script3r/django-tink-fields/issues"
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.4.2",
+    "pytest>=9.0.2",
     "pytest-django>=4.11.1",
-    "pytest-cov>=4.1.0",
-    "coverage>=7.10.6",
-    "black>=24.0.0",
-    "isort>=5.13.0",
-    "flake8>=7.0.0",
-    "pyright>=1.1.405",
-    "sphinx>=7.2.0",
-    "sphinx-rtd-theme>=2.0.0",
+    "pytest-cov>=7.0.0",
+    "coverage>=7.13.0",
+    "black>=25.12.0",
+    "isort>=7.0.0",
+    "flake8>=7.3.0",
+    "pyright>=1.1.407",
+    "sphinx>=8.2.0,<9",
+    "sphinx-rtd-theme>=3.0.2",
 ]
 test = [
-    "pytest>=8.4.2",
+    "pytest>=9.0.2",
     "pytest-django>=4.11.1",
-    "pytest-cov>=4.1.0",
-    "coverage>=7.10.6",
-    "factory-boy>=3.3.0",
-    "freezegun>=1.4.0",
+    "pytest-cov>=7.0.0",
+    "coverage>=7.13.0",
+    "factory-boy>=3.3.3",
+    "freezegun>=1.5.5",
 ]
 
 [tool.setuptools.packages.find]
@@ -165,6 +165,8 @@ reportAbstractUsage = false
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "tink_fields.test.settings.sqlite"
+django_find_project = false
+pythonpath = ["."]
 testpaths = ["tink_fields/test"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]

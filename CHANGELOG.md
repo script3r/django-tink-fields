@@ -13,6 +13,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Performance benchmarks section
 - Security best practices guide
 
+## [0.3.2] - 2025-12-27
+
+### Added
+- Encrypted counterparts for common Django fields (JSON, UUID, Decimal, Boolean, URL, Slug, Float, PositiveInteger)
+- Deterministic UUID and Boolean field support
+- Example Django integration project and extended tests for new fields
+
+### Changed
+- JSON field encryption now preserves structured payloads on round-trip
+- Improved README clarity around easy Django field encryption
+
+## [0.3.1] - 2025-12-27
+
+### Added
+- Cached keyset handles to reduce repeated keyset file reads
+- Example Django project with integration tests covering ciphertext and tamper detection
+
+### Changed
+- Registered Tink primitives during direct field module imports
+- Prepared deterministic lookup values before encryption for better consistency
+- Updated dependency minimums to current releases
+
+### Removed
+- Retired legacy CHANGES.md in favor of this changelog
+
 ## [0.3.0] - 2024-12-19
 
 ### Added
