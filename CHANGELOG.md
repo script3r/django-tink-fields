@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Encrypted counterparts for common Django fields (JSON, UUID, Decimal, Boolean, URL, Slug, Float, PositiveInteger)
 - Deterministic UUID and Boolean field support
 - Example Django integration project and extended tests for new fields
+- Python 3.12+ requirement aligned with Django 6.0
 
 ### Changed
 - JSON field encryption now preserves structured payloads on round-trip

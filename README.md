@@ -20,7 +20,7 @@ Keywords: Django field encryption, encrypted model fields, Google Tink, AEAD, de
 - **🔑 Flexible Key Management**: Support for both cleartext and encrypted keysets
 - **☁️ Cloud Integration**: Works with AWS KMS, GCP KMS, and other key management systems
 - **📊 Comprehensive Testing**: 97%+ test coverage with modern Python practices
-- **🐍 Modern Python**: Supports Python 3.10+ with full type hints
+- **🐍 Modern Python**: Supports Python 3.12+ with full type hints
 
 ## 🚀 Quick Start
 
