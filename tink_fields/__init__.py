@@ -18,6 +18,7 @@ except ImportError:
     daead = None
 
 from .fields import (
+    DeterministicEncryptedBooleanField,
     DeterministicEncryptedCharField,
     DeterministicEncryptedDateField,
     DeterministicEncryptedDateTimeField,
@@ -26,7 +27,6 @@ from .fields import (
     DeterministicEncryptedIntegerField,
     DeterministicEncryptedTextField,
     DeterministicEncryptedUUIDField,
-    DeterministicEncryptedBooleanField,
     EncryptedBinaryField,
     EncryptedBooleanField,
     EncryptedCharField,
