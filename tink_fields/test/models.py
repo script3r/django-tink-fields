@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Any
 
 from django.db import models
@@ -32,6 +33,17 @@ class EncryptedDateTime(models.Model):
 
 class EncryptedNullable(models.Model):
     value = fields.EncryptedIntegerField(null=True)
+
+
+class EncryptedExtended(models.Model):
+    flag = fields.EncryptedBooleanField()
+    positive = fields.EncryptedPositiveIntegerField()
+    ratio = fields.EncryptedFloatField()
+    amount = fields.EncryptedDecimalField(max_digits=8, decimal_places=2)
+    token = fields.EncryptedUUIDField()
+    payload = fields.EncryptedJSONField()
+    url = fields.EncryptedURLField()
+    slug = fields.EncryptedSlugField()
 
 
 def sample_aad_provider(instance: Any) -> bytes:
@@ -72,3 +84,14 @@ class DeterministicEncryptedEmail(models.Model):
 
 class DeterministicEncryptedTextNullable(models.Model):
     value = fields.DeterministicEncryptedTextField(null=True, keyset="deterministic")
+
+
+class DeterministicEncryptedExtended(models.Model):
+    token = fields.DeterministicEncryptedUUIDField(keyset="deterministic", db_index=True)
+    flag = fields.DeterministicEncryptedBooleanField(keyset="deterministic")
+    day = fields.DeterministicEncryptedDateField(keyset="deterministic", default=date.today)
+    moment = fields.DeterministicEncryptedDateTimeField(keyset="deterministic")
+
+
+class DeterministicEncryptedUnique(models.Model):
+    value = fields.DeterministicEncryptedCharField(max_length=25, keyset="deterministic", unique=True)

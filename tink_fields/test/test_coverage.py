@@ -2,11 +2,10 @@ import os
 import tempfile
 from unittest.mock import patch
 
+import pytest
 from django.conf import settings
 from django.core.exceptions import FieldError, ImproperlyConfigured
 from django.db import connection
-
-import pytest
 
 from tink_fields.fields import EncryptedTextField, KeysetConfig
 
@@ -28,7 +27,7 @@ class TestKeysetConfigValidation:
 
     def test_keyset_config_nonexistent_path(self):
         """Test KeysetConfig validation with non-existent path (line 41)"""
-        with pytest.raises(ImproperlyConfigured, match="Keyset .* does not exist"):
+        with pytest.raises(ImproperlyConfigured, match="is not a readable file"):
             KeysetConfig(path="/nonexistent/path/that/does/not/exist.json")
 
     def test_keyset_config_encrypted_without_master_key(self):
@@ -75,25 +74,29 @@ class TestSettingsConfiguration:
 
     def test_missing_tink_config(self):
         """Test missing TINK_FIELDS_CONFIG in settings (line 73)"""
-        with patch.object(settings, "TINK_FIELDS_CONFIG", None):
-            with pytest.raises(
+        with (
+            patch.object(settings, "TINK_FIELDS_CONFIG", None),
+            pytest.raises(
                 ImproperlyConfigured,
                 match="Could not find `TINK_FIELDS_CONFIG` attribute in settings",
-            ):
-                EncryptedTextField()
+            ),
+        ):
+            EncryptedTextField()._get_aead_primitive()
 
     def test_missing_keyset_in_config(self):
         """Test missing keyset in TINK_FIELDS_CONFIG (line 83)"""
-        with patch.object(
-            settings,
-            "TINK_FIELDS_CONFIG",
-            {"default": {"path": "test.json", "cleartext": True}},
-        ):
-            with pytest.raises(
+        with (
+            patch.object(
+                settings,
+                "TINK_FIELDS_CONFIG",
+                {"default": {"path": "test.json", "cleartext": True}},
+            ),
+            pytest.raises(
                 ImproperlyConfigured,
                 match="Could not find configuration for keyset `nonexistent`",
-            ):
-                EncryptedTextField(keyset="nonexistent")
+            ),
+        ):
+            EncryptedTextField(keyset="nonexistent")._get_aead_primitive()
 
 
 class TestCleartextKeysetHandling:
@@ -187,7 +190,7 @@ class TestDatabaseOperationsWithValues:
         # Get the raw value from the database
         with connection.cursor() as cursor:
             cursor.execute(
-                f"SELECT value FROM {models.EncryptedText._meta.db_table} " f"WHERE id = %s",
+                f"SELECT value FROM {models.EncryptedText._meta.db_table} WHERE id = %s",
                 [test_instance.id],
             )
             raw_value = cursor.fetchone()[0]

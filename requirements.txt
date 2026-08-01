@@ -1,4 +1,0 @@
-# Core dependencies
-Django>=6.0
-tink>=1.13.0
-protobuf>=6.33.2

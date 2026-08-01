@@ -1,0 +1,8 @@
+include AUTHORS.md
+include CHANGELOG.md
+include CONTRIBUTING.md
+include LICENSE.txt
+include README.md
+include RELEASING.md
+include SECURITY.md
+prune tink_fields/test

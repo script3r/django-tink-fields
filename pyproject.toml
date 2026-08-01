@@ -1,67 +1,72 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "django-tink-fields"
-version = "0.3.2"
+dynamic = ["version"]
 description = "Tink-based encrypted model fields for Django"
 readme = "README.md"
-requires-python = ">=3.12"
-license = {text = "BSD"}
+requires-python = ">=3.10"
+license = "BSD-3-Clause"
+license-files = ["LICENSE.txt"]
 authors = [
     {name = "Isaac Elbaz", email = "script3r@gmail.com"},
 ]
+keywords = ["django", "encryption", "google-tink", "model-fields"]
 classifiers = [
     "Environment :: Web Environment",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: BSD License",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: Implementation :: CPython",
-    "Programming Language :: Python :: Implementation :: PyPy",
+    "Programming Language :: Python :: 3.14",
     "Framework :: Django",
+    "Framework :: Django :: 5.2",
+    "Framework :: Django :: 6.0",
 ]
 dependencies = [
-    "Django>=6.0",
-    "tink>=1.13.0",
-    "protobuf>=6.33.2",
+    "Django>=5.2,<6.1",
+    "tink>=1.13,<2",
 ]
 
 [project.urls]
 Homepage = "https://github.com/script3r/django-tink-fields/"
 Repository = "https://github.com/script3r/django-tink-fields/"
 Issues = "https://github.com/script3r/django-tink-fields/issues"
+Changelog = "https://github.com/script3r/django-tink-fields/blob/main/CHANGELOG.md"
+Security = "https://github.com/script3r/django-tink-fields/blob/main/SECURITY.md"
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=9.0.2",
-    "pytest-django>=4.11.1",
-    "pytest-cov>=7.0.0",
-    "coverage>=7.13.0",
-    "black>=25.12.0",
-    "isort>=7.0.0",
-    "flake8>=7.3.0",
-    "pyright>=1.1.407",
-    "sphinx>=8.2.0,<9",
-    "sphinx-rtd-theme>=3.0.2",
+    "django-stubs>=5.2",
+    "pyright>=1.1.400",
+    "ruff>=0.12",
 ]
 test = [
-    "pytest>=9.0.2",
-    "pytest-django>=4.11.1",
-    "pytest-cov>=7.0.0",
-    "coverage>=7.13.0",
-    "factory-boy>=3.3.3",
-    "freezegun>=1.5.5",
+    "coverage>=7.6",
+    "pytest>=8.3",
+    "pytest-cov>=6",
+    "pytest-django>=4.9",
 ]
+
+[tool.setuptools]
+include-package-data = false
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["tink_fields*"]
+exclude = ["tink_fields.test*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "tink_fields._version.__version__"}
 
 [tool.coverage.run]
+branch = true
 source = ["tink_fields"]
 omit = ["tink_fields/test/*"]
 
@@ -79,87 +84,25 @@ exclude_lines = [
     "@(abc\\.)?abstractmethod",
 ]
 
-[tool.black]
-line-length = 120
-target-version = ['py310']
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-  # directories
-  \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | build
-  | dist
-)/
-'''
-
-[tool.isort]
-profile = "black"
-multi_line_output = 3
-line_length = 120
-known_django = "django"
-sections = ["FUTURE", "STDLIB", "DJANGO", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
-
 [tool.pyright]
 include = ["tink_fields"]
 exclude = ["tink_fields/test"]
 pythonVersion = "3.10"
-typeCheckingMode = "off"
+typeCheckingMode = "basic"
 useLibraryCodeForTypes = true
-reportMissingImports = true
+reportMissingImports = "error"
 reportMissingTypeStubs = false
-reportGeneralTypeIssues = false
-reportOptionalMemberAccess = false
-reportOptionalSubscript = false
-reportPrivateImportUsage = false
-reportUnknownArgumentType = false
-reportUnknownMemberType = false
-reportUnknownVariableType = false
-reportUntypedFunctionDecorator = false
-reportUntypedClassDecorator = false
-reportUntypedBaseClass = false
-reportUntypedNamedTuple = false
-reportPrivateUsage = false
-reportConstantRedefinition = false
-reportIncompatibleMethodOverride = false
-reportIncompatibleVariableOverride = false
-reportInconsistentConstructor = false
-reportOverlappingOverload = false
-reportMissingSuperCall = false
-reportUninitializedInstanceVariable = false
-reportInvalidStringEscapeSequence = false
-reportUnknownParameterType = false
-reportUnknownLambdaType = false
-reportMissingParameterType = false
-reportMissingTypeArgument = false
-reportInvalidTypeVarUse = false
-reportCallInDefaultInitializer = false
-reportUnnecessaryIsInstance = false
-reportUnnecessaryCast = false
-reportUnnecessaryComparison = false
-reportUnnecessaryContains = false
-reportAssertAlwaysTrue = false
-reportSelfClsParameterName = false
-reportImplicitStringConcatenation = false
-reportInvalidStubStatement = false
-reportIncompleteStub = false
-reportUnsupportedDunderAll = false
-reportUnusedCallResult = false
-reportUnusedCoroutine = false
-reportUnnecessaryTypeIgnoreComment = false
-reportMatchNotExhaustive = false
-reportShadowedImports = false
-reportUnusedImport = false
-reportUnusedClass = false
-reportUnusedFunction = false
-reportUnusedVariable = false
-reportDuplicateImport = false
-reportWildcardImportFromLibrary = false
-reportAbstractUsage = false
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["RUF022"]
+
+[tool.ruff.lint.per-file-ignores]
+"tink_fields/test/*" = ["S101"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "tink_fields.test.settings.sqlite"
@@ -174,6 +117,5 @@ addopts = [
     "--strict-config",
     "--cov=tink_fields",
     "--cov-report=term-missing",
-    "--cov-report=html",
-    "--cov-fail-under=80",
+    "--cov-fail-under=90",
 ]

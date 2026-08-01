@@ -1,90 +1,47 @@
-name: Release
+name: Publish release
 
 on:
   release:
     types: [published]
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to release (e.g., 0.3.0)'
-        required: true
-        type: string
+
+permissions:
+  contents: read
 
 jobs:
-  build-and-publish:
+  publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: pypi
+      url: https://pypi.org/p/django-tink-fields
     permissions:
       contents: read
       id-token: write
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
 
-    - name: Set up Python 3.13.7
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.13.7"
+      - name: Verify release tag matches package version
+        run: |
+          package_version=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' tink_fields/_version.py)
+          test "${GITHUB_REF_NAME}" = "v${package_version}"
 
-    - name: Cache pip dependencies
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
+      - name: Build and validate distributions
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build twine
+          python -m build
+          twine check --strict dist/*
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install build twine
+      - name: Smoke-test the wheel
+        run: |
+          python -m venv /tmp/django-tink-fields-release
+          /tmp/django-tink-fields-release/bin/pip install dist/*.whl
+          /tmp/django-tink-fields-release/bin/python -I -c \
+            "import tink_fields; assert tink_fields.__version__ == '${GITHUB_REF_NAME#v}'"
 
-    - name: Build package
-      run: |
-        python -m build
-
-    - name: Check package
-      run: |
-        twine check dist/*
-
-    - name: Upload to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        user: ${{ secrets.PYPI_USERNAME }}
-        password: ${{ secrets.PYPI_PASSWORD }}
-
-    - name: Create GitHub Release
-      if: github.event_name == 'release'
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.event.release.tag_name }}
-        release_name: ${{ github.event.release.name }}
-        body: ${{ github.event.release.body }}
-        draft: false
-        prerelease: false
-
-  test-release:
-    runs-on: ubuntu-latest
-    needs: build-and-publish
-    if: github.event_name == 'workflow_dispatch'
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Python 3.13.7
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.13.7"
-
-    - name: Install released package
-      run: |
-        python -m pip install --upgrade pip
-        pip install django-tink-fields==${{ github.event.inputs.version }}
-
-    - name: Test installed package
-      run: |
-        python -c "import tink_fields; print('Package installed successfully')"
-        python -c "from tink_fields import EncryptedCharField; print('Fields imported successfully')"
+      - name: Publish to PyPI with trusted publishing
+        uses: pypa/gh-action-pypi-publish@release/v1

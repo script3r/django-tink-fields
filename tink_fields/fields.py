@@ -7,38 +7,28 @@ for cryptographic operations, ensuring data confidentiality and integrity.
 
 from __future__ import annotations
 
+import json
+from collections import OrderedDict
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from os import PathLike
 from pathlib import Path
-from typing import Any, Optional
+from threading import RLock
+from typing import Any, ClassVar, cast
+from weakref import WeakSet
 
 from django.conf import settings
 from django.core.exceptions import FieldError, ImproperlyConfigured
 from django.db import models
 from django.utils.encoding import force_bytes, force_str
 from django.utils.functional import cached_property
-
-from tink import (
-    JsonKeysetReader,
-    aead,
-    cleartext_keyset_handle,
-    read_keyset_handle,
-)
-
-# Try to import deterministic AEAD, fall back gracefully if not available
-try:
-    from tink import daead
-
-    DAEAD_AVAILABLE = True
-except ImportError:
-    DAEAD_AVAILABLE = False
-    daead = None
+from tink import JsonKeysetReader, TinkError, aead, cleartext_keyset_handle, daead, read_keyset_handle
 
 
 def _register_tink_primitives() -> None:
     """Register Tink primitives so direct module imports are safe."""
     aead.register()
-    if DAEAD_AVAILABLE:
-        daead.register()
+    daead.register()
 
 
 _register_tink_primitives()
@@ -69,15 +59,19 @@ __all__ = [
     "DeterministicEncryptedBooleanField",
     "DeterministicEncryptedDateField",
     "DeterministicEncryptedDateTimeField",
+    "clear_keyset_cache",
 ]
 
 
 # Constants
-UNSUPPORTED_PROPERTIES = frozenset(["primary_key", "db_index", "unique"])
+UNSUPPORTED_PROPERTIES = frozenset(["primary_key", "db_index", "unique", "db_default"])
 DEFAULT_KEYSET = "default"
+DAEAD_AVAILABLE = True
+
+AADCallback = Callable[[models.Field], bytes]
 
 
-def _default_aad_callback(x: Any) -> bytes:
+def _default_aad_callback(field: models.Field) -> bytes:
     """Default AAD callback that returns empty bytes."""
     return b""
 
@@ -95,15 +89,15 @@ class KeysetConfig:
         cleartext: Whether the keyset is in cleartext format
     """
 
-    path: str
-    master_key_aead: Optional[aead.Aead] = None
+    path: str | PathLike[str]
+    master_key_aead: aead.Aead | None = None
     cleartext: bool = False
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate the keyset configuration after initialization."""
         self.validate()
 
-    def validate(self):
+    def validate(self) -> None:
         """Validate the keyset configuration.
 
         Raises:
@@ -112,8 +106,11 @@ class KeysetConfig:
         if not self.path:
             raise ImproperlyConfigured("Keyset path cannot be None or empty.")
 
-        if not Path(self.path).exists():
-            raise ImproperlyConfigured(f"Keyset {self.path} does not exist.")
+        if not Path(self.path).is_file():
+            raise ImproperlyConfigured(f"Keyset `{self.path}` is not a readable file.")
+
+        if not isinstance(self.cleartext, bool):
+            raise ImproperlyConfigured("Keyset option `cleartext` must be a boolean.")
 
         if not self.cleartext and self.master_key_aead is None:
             raise ImproperlyConfigured("Encrypted keysets must specify `master_key_aead`.")
@@ -126,9 +123,12 @@ class KeysetManager:
     their associated primitives, with proper caching to avoid memory leaks.
     """
 
-    _handle_cache: dict[tuple[str, str, bool, int], Any] = {}
+    _cache_size: ClassVar[int] = 32
+    _cache_lock: ClassVar[RLock] = RLock()
+    _handle_cache: ClassVar[OrderedDict[tuple[Any, ...], Any]] = OrderedDict()
+    _managers: ClassVar[WeakSet[KeysetManager]] = WeakSet()
 
-    def __init__(self, keyset_name: str, aad_callback: Any):
+    def __init__(self, keyset_name: str, aad_callback: AADCallback = _default_aad_callback) -> None:
         """Initialize the keyset manager.
 
         Args:
@@ -139,23 +139,10 @@ class KeysetManager:
         self.aad_callback = aad_callback
         self._keyset_handle = None
 
-        # Validate configuration immediately
-        self._validate_config()
+        with self._cache_lock:
+            self._managers.add(self)
 
-    def _validate_config(self):
-        """Validate the keyset configuration.
-
-        Raises:
-            ImproperlyConfigured: If the configuration is invalid
-        """
-        config = self._get_config()
-
-        if self.keyset_name not in config:
-            raise ImproperlyConfigured(
-                f"Could not find configuration for keyset `{self.keyset_name}` " f"in `TINK_FIELDS_CONFIG`."
-            )
-
-    def _get_config(self):
+    def _get_config(self) -> Mapping[str, Mapping[str, Any]]:
         """Get the Tink fields configuration from Django settings.
 
         Returns:
@@ -167,9 +154,37 @@ class KeysetManager:
         config = getattr(settings, "TINK_FIELDS_CONFIG", None)
         if config is None:
             raise ImproperlyConfigured("Could not find `TINK_FIELDS_CONFIG` attribute in settings.")
+        if not isinstance(config, Mapping):
+            raise ImproperlyConfigured("`TINK_FIELDS_CONFIG` must be a mapping of keyset names to options.")
         return config
 
-    def _get_tink_keyset_handle(self):
+    def _get_keyset_config(self) -> KeysetConfig:
+        """Return and validate this manager's keyset configuration."""
+        config = self._get_config()
+        if self.keyset_name not in config:
+            raise ImproperlyConfigured(
+                f"Could not find configuration for keyset `{self.keyset_name}` in `TINK_FIELDS_CONFIG`."
+            )
+
+        options = config[self.keyset_name]
+        if not isinstance(options, Mapping):
+            raise ImproperlyConfigured(f"Configuration for keyset `{self.keyset_name}` must be a mapping.")
+        try:
+            return KeysetConfig(**options)
+        except TypeError as error:
+            raise ImproperlyConfigured(f"Invalid configuration for keyset `{self.keyset_name}`: {error}") from error
+
+    @classmethod
+    def clear_cache(cls) -> None:
+        """Clear cached handles and primitives, for example after key rotation."""
+        with cls._cache_lock:
+            cls._handle_cache.clear()
+            for manager in list(cls._managers):
+                manager._keyset_handle = None
+                manager.__dict__.pop("aead_primitive", None)
+                manager.__dict__.pop("daead_primitive", None)
+
+    def _get_tink_keyset_handle(self) -> Any:
         """Read the configuration for the requested keyset and return a keyset handle.
 
         Returns:
@@ -179,36 +194,51 @@ class KeysetManager:
             ImproperlyConfigured: If keyset configuration is invalid or missing
         """
         if self._keyset_handle is None:
-            config = self._get_config()
-
-            if self.keyset_name not in config:
-                raise ImproperlyConfigured(
-                    f"Could not find configuration for keyset `{self.keyset_name}` " f"in `TINK_FIELDS_CONFIG`."
-                )
-
-            keyset_config = KeysetConfig(**config[self.keyset_name])
+            keyset_config = self._get_keyset_config()
+            keyset_path = Path(keyset_config.path).expanduser().resolve()
+            try:
+                stat = keyset_path.stat()
+            except OSError as error:
+                raise ImproperlyConfigured(f"Could not load keyset `{self.keyset_name}`.") from error
             cache_key = (
-                self.keyset_name,
-                keyset_config.path,
+                str(keyset_path),
+                stat.st_mtime_ns,
+                stat.st_size,
                 keyset_config.cleartext,
-                id(keyset_config.master_key_aead) if keyset_config.master_key_aead is not None else 0,
+                keyset_config.master_key_aead,
             )
-            cached_handle = self._handle_cache.get(cache_key)
-            if cached_handle is not None:
-                self._keyset_handle = cached_handle
-            else:
-                with open(keyset_config.path, "r", encoding="utf-8") as f:
-                    reader = JsonKeysetReader(f.read())
-                    if keyset_config.cleartext:
-                        self._keyset_handle = cleartext_keyset_handle.read(reader)
-                    else:
-                        self._keyset_handle = read_keyset_handle(reader, keyset_config.master_key_aead)
-                self._handle_cache[cache_key] = self._keyset_handle
+            try:
+                hash(cache_key)
+            except TypeError:
+                cache_key = ()
+
+            with self._cache_lock:
+                cached_handle = self._handle_cache.get(cache_key) if cache_key else None
+                if cached_handle is not None:
+                    self._handle_cache.move_to_end(cache_key)
+                    self._keyset_handle = cached_handle
+                else:
+                    try:
+                        reader = JsonKeysetReader(keyset_path.read_text(encoding="utf-8"))
+                        if keyset_config.cleartext:
+                            self._keyset_handle = cleartext_keyset_handle.read(reader)
+                        else:
+                            master_key_aead = keyset_config.master_key_aead
+                            assert master_key_aead is not None
+                            self._keyset_handle = read_keyset_handle(reader, master_key_aead)
+                    except (OSError, TinkError) as error:
+                        raise ImproperlyConfigured(f"Could not load keyset `{self.keyset_name}`.") from error
+
+                    if cache_key:
+                        self._handle_cache[cache_key] = self._keyset_handle
+                        self._handle_cache.move_to_end(cache_key)
+                        while len(self._handle_cache) > self._cache_size:
+                            self._handle_cache.popitem(last=False)
 
         return self._keyset_handle
 
     @cached_property
-    def aead_primitive(self):
+    def aead_primitive(self) -> aead.Aead:
         """Get the AEAD primitive for encryption/decryption operations.
 
         Returns:
@@ -217,7 +247,7 @@ class KeysetManager:
         return self._get_tink_keyset_handle().primitive(aead.Aead)
 
     @cached_property
-    def daead_primitive(self):
+    def daead_primitive(self) -> daead.DeterministicAead:
         """Get the Deterministic AEAD primitive for encryption/decryption operations.
 
         Returns:
@@ -226,19 +256,22 @@ class KeysetManager:
         Raises:
             ImproperlyConfigured: If deterministic AEAD is not available or keyset doesn't support it
         """
-        if not DAEAD_AVAILABLE:
-            raise ImproperlyConfigured(
-                "Deterministic AEAD is not available in this version of Tink. "
-                "Please upgrade to a newer version that supports deterministic AEAD."
-            )
-
         try:
             return self._get_tink_keyset_handle().primitive(daead.DeterministicAead)
-        except Exception as e:
+        except TinkError as error:
             raise ImproperlyConfigured(
-                f"Current keyset does not support deterministic AEAD: {e}. "
+                "Current keyset does not support deterministic AEAD. "
                 "Please use a keyset that contains deterministic AEAD keys."
-            )
+            ) from error
+
+
+def clear_keyset_cache() -> None:
+    """Clear all in-process keyset handles and primitives.
+
+    Call this after replacing a keyset file when a process must adopt the new
+    primary key without restarting.
+    """
+    KeysetManager.clear_cache()
 
 
 class EncryptedField(models.Field):
@@ -266,19 +299,31 @@ class EncryptedField(models.Field):
         """
         # Validate unsupported properties
         for prop in self._unsupported_properties:
-            if prop in kwargs:
-                raise ImproperlyConfigured(f"Field `{self.__class__.__name__}` does not support " f"property `{prop}`.")
+            if (prop == "db_default" and prop in kwargs) or kwargs.get(prop):
+                raise ImproperlyConfigured(f"Field `{self.__class__.__name__}` does not support property `{prop}`.")
 
         # Extract custom parameters
         self._keyset = kwargs.pop("keyset", DEFAULT_KEYSET)
         self._aad_callback = kwargs.pop("aad_callback", DEFAULT_AAD_CALLBACK)
+        if not isinstance(self._keyset, str) or not self._keyset:
+            raise ImproperlyConfigured("`keyset` must be a non-empty string.")
+        if not callable(self._aad_callback):
+            raise ImproperlyConfigured("`aad_callback` must be callable.")
+        self._aad_callback = cast(AADCallback, self._aad_callback)
 
         # Call parent constructor first
         super().__init__(*args, **kwargs)
 
-        # Initialize keyset manager after parent constructor
-        # This ensures the field is properly initialized before accessing settings
         self._keyset_manager = KeysetManager(self._keyset, self._aad_callback)
+
+    def deconstruct(self) -> tuple[str | None, str, Sequence[Any], dict[str, Any]]:
+        """Serialize encryption options into Django migrations."""
+        name, path, args, kwargs = super().deconstruct()
+        if self._keyset != DEFAULT_KEYSET:
+            kwargs["keyset"] = self._keyset
+        if self._aad_callback is not DEFAULT_AAD_CALLBACK:
+            kwargs["aad_callback"] = self._aad_callback
+        return name, path, args, kwargs
 
     def _to_python_prepare(self, value: bytes) -> str:
         """Prepare decrypted value for to_python conversion.
@@ -291,7 +336,7 @@ class EncryptedField(models.Field):
         """
         return force_str(value)
 
-    def _get_aead_primitive(self):
+    def _get_aead_primitive(self) -> aead.Aead:
         """Get the AEAD primitive for encryption/decryption operations.
 
         This method is kept for backward compatibility with tests.
@@ -301,8 +346,17 @@ class EncryptedField(models.Field):
         """
         return self._keyset_manager.aead_primitive
 
+    def _get_aad(self) -> bytes:
+        """Return validated associated authenticated data for this field."""
+        aad = self._aad_callback(self)
+        if not isinstance(aad, bytes):
+            raise ImproperlyConfigured(
+                f"`aad_callback` for {self.__class__.__name__} must return bytes, got {type(aad).__name__}."
+            )
+        return aad
+
     @property
-    def _keyset_handle(self):
+    def _keyset_handle(self) -> Any:
         """Get the keyset handle for backward compatibility.
 
         Returns:
@@ -310,7 +364,7 @@ class EncryptedField(models.Field):
         """
         return self._keyset_manager._get_tink_keyset_handle()
 
-    def get_internal_type(self):
+    def get_internal_type(self) -> str:
         """Return the internal Django field type.
 
         Returns:
@@ -328,12 +382,18 @@ class EncryptedField(models.Field):
         Returns:
             Binary object containing encrypted data, or None if value is None
         """
-        val = super().get_db_prep_save(value, connection)
+        if hasattr(value, "resolve_expression"):
+            raise FieldError(f"{self.__class__.__name__} does not support database expressions.")
+        val = self._prepare_value_for_database(value, connection)
         if val is not None:
             return connection.Database.Binary(
-                self._keyset_manager.aead_primitive.encrypt(force_bytes(val), self._aad_callback(self))
+                self._keyset_manager.aead_primitive.encrypt(force_bytes(val), self._get_aad())
             )
         return None
+
+    def _prepare_value_for_database(self, value: Any, connection: Any) -> Any:
+        """Apply the concrete Django field's database preparation semantics."""
+        return super().get_db_prep_save(value, connection)
 
     def from_db_value(
         self,
@@ -354,7 +414,7 @@ class EncryptedField(models.Field):
             Decrypted and converted Python object, or None if value is None
         """
         if value is not None:
-            decrypted = self._keyset_manager.aead_primitive.decrypt(bytes(value), self._aad_callback(self))
+            decrypted = self._keyset_manager.aead_primitive.decrypt(bytes(value), self._get_aad())
             return self.to_python(self._to_python_prepare(decrypted))
         return None
 
@@ -378,7 +438,7 @@ class EncryptedField(models.Field):
         finally:
             self.__dict__["_internal_type"] = original_internal_type
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Return string representation of the field.
 
         Returns:
@@ -398,9 +458,11 @@ def _create_lookup_class(lookup_name: str, base_lookup_class: type[Any]) -> type
         type: New lookup class that raises FieldError
     """
 
-    def get_prep_lookup(self) -> None:
+    def get_prep_lookup(self) -> Any:
         """Raise error for unsupported lookups."""
-        raise FieldError(f"{self.lhs.field.__class__.__name__} `{self.lookup_name}` " f"does not support lookups.")
+        if self.lookup_name == "exact" and self.rhs is None:
+            return None
+        raise FieldError(f"{self.lhs.field.__class__.__name__} `{self.lookup_name}` does not support lookups.")
 
     return type(
         f"EncryptedField{lookup_name}",
@@ -426,36 +488,37 @@ def _create_deterministic_lookup_class(lookup_name: str, base_lookup_class: type
     def get_prep_lookup(self) -> Any:
         """Handle lookups for deterministic encrypted fields."""
         if self.lookup_name == "exact":
-            # For exact lookups, we need to encrypt the value and use 'in' lookup
-            value = self.rhs
-            if value is None:
-                return None
-
-            # Get the field instance
-            field = self.lhs.field
-            if hasattr(field, "_keyset_manager"):
-                prepared_value = field.get_prep_value(value)
-                if prepared_value is None:
-                    return None
-                # Encrypt the value using the field's keyset manager
-                encrypted_value = field._keyset_manager.daead_primitive.encrypt_deterministically(
-                    force_bytes(prepared_value), field._aad_callback(field)
-                )
-                # Return the encrypted value directly
-                return encrypted_value
-            else:
-                raise FieldError("Field does not have keyset manager for deterministic encryption.")
-        elif self.lookup_name == "isnull":
-            # isnull lookups are always supported
+            if hasattr(self.rhs, "resolve_expression"):
+                raise FieldError("Deterministic encrypted lookups do not support database expressions.")
             return self.rhs
-        else:
-            # All other lookups are not supported
-            raise FieldError(f"{self.lhs.field.__class__.__name__} `{self.lookup_name}` " f"does not support lookups.")
+        raise FieldError(f"{self.lhs.field.__class__.__name__} `{self.lookup_name}` does not support lookups.")
+
+    def get_db_prep_lookup(self, value: Any, connection: Any) -> tuple[str, list[Any]]:
+        """Prepare and deterministically encrypt an exact lookup value."""
+        field = self.lhs.field
+        prepared_value = field._prepare_value_for_database(value, connection)
+        if prepared_value is None:
+            return "%s", [None]
+        encrypted_value = field._keyset_manager.daead_primitive.encrypt_deterministically(
+            force_bytes(prepared_value), field._get_aad()
+        )
+        return "%s", [connection.Database.Binary(encrypted_value)]
+
+    def as_sql(self, compiler: Any, connection: Any) -> tuple[str, tuple[Any, ...]]:
+        """Render equality without Django's plaintext Boolean shortcut."""
+        lhs_sql, lhs_params = self.process_lhs(compiler, connection)
+        rhs_sql, rhs_params = self.process_rhs(compiler, connection)
+        rhs_sql = self.get_rhs_op(connection, rhs_sql)
+        return f"{lhs_sql} {rhs_sql}", (*lhs_params, *rhs_params)
 
     return type(
         f"DeterministicEncryptedField{lookup_name}",
         (base_lookup_class,),
-        {"get_prep_lookup": get_prep_lookup},
+        {
+            "get_prep_lookup": get_prep_lookup,
+            "get_db_prep_lookup": get_db_prep_lookup,
+            "as_sql": as_sql,
+        },
     )
 
 
@@ -530,14 +593,11 @@ class EncryptedUUIDField(EncryptedField, models.UUIDField):
 class EncryptedJSONField(EncryptedField, models.JSONField):
     """Encrypted JSON field."""
 
-    def get_db_prep_save(self, value: Any, connection: Any) -> Any:
-        """Prepare JSON values using JSONField semantics, then encrypt."""
-        val = models.JSONField.get_db_prep_save(self, value, connection)
-        if val is not None:
-            return connection.Database.Binary(
-                self._keyset_manager.aead_primitive.encrypt(force_bytes(val), self._aad_callback(self))
-            )
-        return None
+    def _prepare_value_for_database(self, value: Any, connection: Any) -> Any:
+        """Serialize JSON before database-specific adapters can wrap it."""
+        if value is None:
+            return None
+        return json.dumps(value, cls=self.encoder)
 
     def from_db_value(
         self,
@@ -548,7 +608,7 @@ class EncryptedJSONField(EncryptedField, models.JSONField):
     ) -> Any:
         """Convert database value to Python object with JSON decoding."""
         if value is not None:
-            decrypted = self._keyset_manager.aead_primitive.decrypt(bytes(value), self._aad_callback(self))
+            decrypted = self._keyset_manager.aead_primitive.decrypt(bytes(value), self._get_aad())
             return models.JSONField.from_db_value(self, force_str(decrypted), expression, connection)
         return None
 
@@ -609,6 +669,8 @@ class DeterministicEncryptedField(EncryptedField):
     reveals patterns in the data. Use only when searchability is required.
     """
 
+    _unsupported_properties = frozenset(["primary_key", "db_default"])
+
     def get_db_prep_save(self, value: Any, connection: Any) -> Any:
         """Prepare the value for saving to the database using deterministic encryption.
 
@@ -619,13 +681,12 @@ class DeterministicEncryptedField(EncryptedField):
         Returns:
             Binary object containing deterministically encrypted data, or None if value is None
         """
-        # Call the grandparent's get_db_prep_save to avoid using regular AEAD
-        val = super(EncryptedField, self).get_db_prep_save(value, connection)
+        if hasattr(value, "resolve_expression"):
+            raise FieldError(f"{self.__class__.__name__} does not support database expressions.")
+        val = self._prepare_value_for_database(value, connection)
         if val is not None:
             return connection.Database.Binary(
-                self._keyset_manager.daead_primitive.encrypt_deterministically(
-                    force_bytes(val), self._aad_callback(self)
-                )
+                self._keyset_manager.daead_primitive.encrypt_deterministically(force_bytes(val), self._get_aad())
             )
         return None
 
@@ -648,9 +709,7 @@ class DeterministicEncryptedField(EncryptedField):
             Decrypted and converted Python object, or None if value is None
         """
         if value is not None:
-            decrypted = self._keyset_manager.daead_primitive.decrypt_deterministically(
-                bytes(value), self._aad_callback(self)
-            )
+            decrypted = self._keyset_manager.daead_primitive.decrypt_deterministically(bytes(value), self._get_aad())
             return self.to_python(self._to_python_prepare(decrypted))
         return None
 
