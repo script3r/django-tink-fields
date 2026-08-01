@@ -1,373 +1,202 @@
 # Django Tink Fields
 
-[![PyPI version](https://badge.fury.io/py/django-tink-fields.svg)](https://badge.fury.io/py/django-tink-fields)
-[![Python Support](https://img.shields.io/pypi/pyversions/django-tink-fields.svg)](https://pypi.org/project/django-tink-fields/)
-[![Django Support](https://img.shields.io/pypi/djversions/django-tink-fields.svg)](https://pypi.org/project/django-tink-fields/)
-[![License](https://img.shields.io/pypi/l/django-tink-fields.svg)](https://pypi.org/project/django-tink-fields/)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![Tests](https://github.com/script3r/django-tink-fields/workflows/Tests/badge.svg)](https://github.com/script3r/django-tink-fields/actions)
+[![PyPI](https://img.shields.io/pypi/v/django-tink-fields.svg)](https://pypi.org/project/django-tink-fields/)
+[![Python](https://img.shields.io/pypi/pyversions/django-tink-fields.svg)](https://pypi.org/project/django-tink-fields/)
+[![Django](https://img.shields.io/pypi/djversions/django-tink-fields.svg)](https://pypi.org/project/django-tink-fields/)
+[![CI](https://github.com/script3r/django-tink-fields/actions/workflows/ci.yml/badge.svg)](https://github.com/script3r/django-tink-fields/actions/workflows/ci.yml)
 
-**Django Tink Fields** is a simple, production-ready way to encrypt Django model fields using the [Google Tink](https://developers.google.com/tink) cryptographic library. It offers drop-in encrypted field types for Django models, so you can protect sensitive data with minimal code changes.
+Encrypted Django model fields backed by [Google Tink](https://developers.google.com/tink). Randomized AEAD fields protect confidentiality and integrity; deterministic AEAD fields additionally support exact database lookups when their equality leakage is acceptable.
 
-Keywords: Django field encryption, encrypted model fields, Google Tink, AEAD, deterministic encryption.
+## Compatibility
 
-## ✨ Features
+| Python | Django |
+| --- | --- |
+| 3.10, 3.11 | 5.2 |
+| 3.12 | 5.2, 6.0 |
+| 3.13, 3.14 | 5.2, 6.0 |
 
-- **🔐 Strong Encryption**: Uses Google Tink for state-of-the-art cryptographic operations
-- **🛡️ AEAD Security**: Provides both confidentiality and integrity through Authenticated Encryption with Associated Data
-- **🔧 Easy Integration**: Drop-in replacement for Django's standard field types
-- **⚡ High Performance**: Optimized with caching and efficient key management
-- **🔑 Flexible Key Management**: Support for both cleartext and encrypted keysets
-- **☁️ Cloud Integration**: Works with AWS KMS, GCP KMS, and other key management systems
-- **📊 Comprehensive Testing**: 97%+ test coverage with modern Python practices
-- **🐍 Modern Python**: Supports Python 3.12+ with full type hints
+The package is tested against SQLite. The fields use Django's `BinaryField` database type and are intended to work on every database supported by Django, but applications should run their own backend-specific integration tests.
 
-## 🚀 Quick Start
-
-### Installation
+## Installation
 
 ```bash
-pip install django-tink-fields
+python -m pip install django-tink-fields
 ```
 
-### Basic Configuration
+## Configuration
 
-Add to your `settings.py`:
+Create a Tink JSON keyset, then configure its path in Django settings. A cleartext keyset contains the encryption key itself: use one only for local development or when the file is protected by controls appropriate for production secrets.
+
+```bash
+tinkey create-keyset \
+  --key-template AES256_GCM \
+  --out-format json \
+  --out keyset.json
+```
+
+```python
+# settings.py
+TINK_FIELDS_CONFIG = {
+    "default": {
+        "path": "/run/secrets/application-keyset.json",
+        "cleartext": True,
+    },
+}
+```
+
+Encrypted keysets require a Tink `Aead` supplied by your KMS integration:
 
 ```python
 TINK_FIELDS_CONFIG = {
     "default": {
-        "cleartext": True,
-        "path": "/path/to/your/keyset.json",
-    }
+        "path": "/run/secrets/encrypted-keyset.json",
+        "cleartext": False,
+        "master_key_aead": kms_aead,
+    },
 }
 ```
 
-### Create a Keyset
+Configuration and key files are loaded lazily, when a field first encrypts or decrypts a value. This allows Django to import models and serialize migrations in environments that do not hold production keys.
 
-Generate a test keyset using `tinkey`:
-
-```bash
-tinkey create-keyset \
-    --out-format json \
-    --out keyset.json \
-    --key-template AES128_GCM
-```
-
-### Use in Your Models
+## Usage
 
 ```python
 from django.db import models
-from tink_fields import EncryptedCharField, EncryptedTextField
+from tink_fields import EncryptedCharField, EncryptedDateField, EncryptedEmailField
 
-class UserProfile(models.Model):
+
+class Customer(models.Model):
     name = EncryptedCharField(max_length=100)
-    bio = EncryptedTextField()
     email = EncryptedEmailField()
-    age = EncryptedIntegerField()
-    created_at = EncryptedDateTimeField()
+    birth_date = EncryptedDateField(null=True)
 ```
 
-## 📖 Documentation
+Values are ordinary Python objects on model instances. Django validates them using the corresponding built-in field's validators, encrypts them before database storage, and decrypts them when loading rows.
 
-### Supported Field Types
+### Randomized fields
 
-| Field Type | Django Equivalent | Description |
-|------------|-------------------|-------------|
-| `EncryptedCharField` | `CharField` | Encrypted character field |
-| `EncryptedTextField` | `TextField` | Encrypted text field |
-| `EncryptedEmailField` | `EmailField` | Encrypted email field |
-| `EncryptedBooleanField` | `BooleanField` | Encrypted boolean field |
-| `EncryptedIntegerField` | `IntegerField` | Encrypted integer field |
-| `EncryptedPositiveIntegerField` | `PositiveIntegerField` | Encrypted positive integer field |
-| `EncryptedFloatField` | `FloatField` | Encrypted float field |
-| `EncryptedDecimalField` | `DecimalField` | Encrypted decimal field |
-| `EncryptedUUIDField` | `UUIDField` | Encrypted UUID field |
-| `EncryptedJSONField` | `JSONField` | Encrypted JSON field |
-| `EncryptedURLField` | `URLField` | Encrypted URL field |
-| `EncryptedSlugField` | `SlugField` | Encrypted slug field |
-| `EncryptedDateField` | `DateField` | Encrypted date field |
-| `EncryptedDateTimeField` | `DateTimeField` | Encrypted datetime field |
-| `EncryptedBinaryField` | `BinaryField` | Encrypted binary field |
+| Encrypted field | Django value semantics |
+| --- | --- |
+| `EncryptedBinaryField` | `BinaryField` |
+| `EncryptedBooleanField` | `BooleanField` |
+| `EncryptedCharField` | `CharField` |
+| `EncryptedDateField` | `DateField` |
+| `EncryptedDateTimeField` | `DateTimeField` |
+| `EncryptedDecimalField` | `DecimalField` |
+| `EncryptedEmailField` | `EmailField` |
+| `EncryptedFloatField` | `FloatField` |
+| `EncryptedIntegerField` | `IntegerField` |
+| `EncryptedJSONField` | `JSONField` |
+| `EncryptedPositiveIntegerField` | `PositiveIntegerField` |
+| `EncryptedSlugField` | `SlugField` |
+| `EncryptedTextField` | `TextField` |
+| `EncryptedURLField` | `URLField` |
+| `EncryptedUUIDField` | `UUIDField` |
 
-### Deterministic Field Types
+Randomized fields deliberately reject `primary_key`, `unique`, `db_index`, and `db_default`. They support `isnull` queries, including the equivalent `field=None`; every lookup that compares values raises `FieldError`. Database expressions such as `F()` assignments are also rejected because the database cannot encrypt them.
 
-| Field Type | Django Equivalent | Description |
-|------------|-------------------|-------------|
-| `DeterministicEncryptedTextField` | `TextField` | Deterministic encrypted text field |
-| `DeterministicEncryptedCharField` | `CharField` | Deterministic encrypted character field |
-| `DeterministicEncryptedEmailField` | `EmailField` | Deterministic encrypted email field |
-| `DeterministicEncryptedIntegerField` | `IntegerField` | Deterministic encrypted integer field |
-| `DeterministicEncryptedUUIDField` | `UUIDField` | Deterministic encrypted UUID field |
-| `DeterministicEncryptedBooleanField` | `BooleanField` | Deterministic encrypted boolean field |
-| `DeterministicEncryptedDateField` | `DateField` | Deterministic encrypted date field |
-| `DeterministicEncryptedDateTimeField` | `DateTimeField` | Deterministic encrypted datetime field |
+### Deterministic fields and exact lookups
 
-### Configuration Options
+Generate a separate deterministic keyset and name it in settings:
 
-#### Cleartext Keysets (Development/Testing)
+```bash
+tinkey create-keyset \
+  --key-template AES256_SIV \
+  --out-format json \
+  --out deterministic-keyset.json
+```
 
 ```python
 TINK_FIELDS_CONFIG = {
-    "default": {
-        "cleartext": True,
-        "path": "/path/to/cleartext_keyset.json",
-    }
+    "default": {"path": "/run/secrets/keyset.json", "cleartext": True},
+    "search": {"path": "/run/secrets/deterministic-keyset.json", "cleartext": True},
 }
 ```
 
-#### Encrypted Keysets (Production)
-
 ```python
-from tink.integration import gcpkms
-from tink import aead
+from tink_fields import DeterministicEncryptedCharField
 
-# Register AEAD primitives
-aead.register()
 
-# Configure GCP KMS
-TINK_MASTER_KEY_URI = "gcp-kms://projects/your-project/locations/global/keyRings/your-keyring/cryptoKeys/your-key"
-gcp_client = gcpkms.GcpKmsClient(TINK_MASTER_KEY_URI, "")
-gcp_aead = gcp_client.get_aead(TINK_MASTER_KEY_URI)
+class ExternalIdentity(models.Model):
+    subject = DeterministicEncryptedCharField(
+        max_length=255,
+        keyset="search",
+        db_index=True,
+        unique=True,
+    )
 
-TINK_FIELDS_CONFIG = {
-    "default": {
-        "cleartext": False,
-        "path": "/path/to/encrypted_keyset.json",
-        "master_key_aead": gcp_aead,
-    }
-}
+
+identity = ExternalIdentity.objects.get(subject="stable-external-id")
 ```
 
-#### Multiple Keysets
+Available deterministic types are `Text`, `Char`, `Email`, `Integer`, `UUID`, `Boolean`, `Date`, and `DateTime`. They support only `exact` and `isnull` lookups. `db_index` and `unique` are supported; primary keys and database defaults are not.
+
+Deterministic encryption reveals when rows contain equal values, which can expose frequency and membership information. Do not use it for low-entropy secrets such as Boolean values, status codes, or predictable identifiers unless that leakage is explicitly acceptable. An index makes equality patterns still easier to observe.
+
+## Multiple keysets and AAD
+
+Pass `keyset` to select a non-default configuration. Pass a module-level `aad_callback` to bind ciphertext to stable field context:
 
 ```python
-TINK_FIELDS_CONFIG = {
-    "default": {
-        "cleartext": True,
-        "path": "/path/to/default_keyset.json",
-    },
-    "sensitive": {
-        "cleartext": False,
-        "path": "/path/to/sensitive_keyset.json",
-        "master_key_aead": sensitive_aead,
-    }
-}
-```
+from django.db import models
+from django.utils.encoding import force_bytes
+from tink_fields import EncryptedCharField
 
-### Advanced Usage
 
-#### Custom Keyset per Field
+def field_aad(field: models.Field) -> bytes:
+    return force_bytes(f"{field.model._meta.label}:{field.name}")
 
-```python
-class SensitiveData(models.Model):
-    # Uses the "sensitive" keyset
-    secret = EncryptedCharField(max_length=100, keyset="sensitive")
-    # Uses the default keyset
-    public_data = EncryptedCharField(max_length=100)
-```
 
-#### Associated Authenticated Data (AAD)
-
-Add additional context to your encryption for enhanced security:
-
-```python
-def get_aad_for_field(field):
-    """Generate AAD based on field and model context."""
-    return f"model_{field.model._meta.label}_{field.name}".encode()
-
-class UserData(models.Model):
-    # Each field gets unique AAD
-    ssn = EncryptedCharField(
-        max_length=11, 
-        aad_callback=get_aad_for_field
+class Credential(models.Model):
+    secret = EncryptedCharField(
+        max_length=255,
+        keyset="credentials",
+        aad_callback=field_aad,
     )
 ```
 
-#### Field Validation
+The callback receives the Django field, not the model instance. It must return the same bytes for every future read of existing ciphertext. Keep it at module scope so Django migrations can serialize it. Renaming a model or field will make context-derived AAD change, so plan a data migration before such a rename.
 
-Encrypted fields support all standard Django field validators:
+## Key rotation and data migrations
+
+Tink key rotation normally adds a new primary key while retaining old enabled keys for decryption. Replace the configured keyset atomically and restart application processes. If an immediate in-process reload is required, call:
 
 ```python
-class ValidatedModel(models.Model):
-    email = EncryptedEmailField(unique=True)
-    age = EncryptedIntegerField(validators=[MinValueValidator(18)])
-    name = EncryptedCharField(max_length=50, blank=False)
+from tink_fields import clear_keyset_cache
+
+clear_keyset_cache()
 ```
 
-### Key Management
+Changing `keyset=` does not re-encrypt existing rows; it only changes how future reads and writes are processed. Likewise, changing an existing plaintext Django field to an encrypted field requires an explicit staged data migration. Back up data and test recovery before any key or ciphertext migration.
 
-#### Creating Keysets with tinkey
+## Security limitations
 
-**Cleartext keyset (development):**
-```bash
-tinkey create-keyset \
-    --out-format json \
-    --out dev_keyset.json \
-    --key-template AES128_GCM
-```
+- Losing the keyset or required master key makes data unrecoverable.
+- Exposing a cleartext keyset exposes every value encrypted with it.
+- Encryption does not hide row existence, nullness, ciphertext length, access patterns, or—when deterministic encryption is used—equality patterns.
+- Ordering encrypted columns is permitted by databases but orders ciphertext, not plaintext, and has no useful application meaning.
+- AAD authenticates context but is not secret and is not stored automatically.
+- Validation happens before storage but is not a substitute for authorization, logging controls, backups, or database security.
 
-**Encrypted keyset with GCP KMS:**
-```bash
-tinkey create-keyset \
-    --out-format json \
-    --out prod_keyset.json \
-    --key-template AES256_GCM \
-    --master-key-uri=gcp-kms://projects/my-project/locations/global/keyRings/my-keyring/cryptoKeys/my-key
-```
+See [SECURITY.md](SECURITY.md) for vulnerability reporting and supported releases.
 
-**Encrypted keyset with AWS KMS:**
-```bash
-tinkey create-keyset \
-    --out-format json \
-    --out prod_keyset.json \
-    --key-template AES256_GCM \
-    --master-key-uri=aws-kms://arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012
-```
-
-## 🔒 Security Considerations
-
-### Best Practices
-
-1. **Key Management**: Use encrypted keysets in production with proper key management systems
-2. **Key Rotation**: Implement regular key rotation strategies
-3. **Access Control**: Restrict access to keyset files and master keys
-4. **AAD Usage**: Use AAD to bind encryption to specific contexts
-5. **Field Selection**: Only encrypt truly sensitive data to maintain performance
-
-### Limitations
-
-- **No Database Queries**: Encrypted fields cannot be used in database queries (except `isnull`)
-- **No Indexing**: Encrypted fields cannot be indexed or used as primary keys
-- **Performance**: Encryption/decryption adds computational overhead
-- **Key Management**: Requires careful key management and rotation
-
-## 🧪 Testing
-
-The package includes comprehensive tests with 97%+ coverage:
+## Development
 
 ```bash
-# Run tests
-pytest
-
-# Run with coverage
-pytest --cov=tink_fields --cov-report=html
-
-# Run specific test categories
-pytest tink_fields/test/test_fields.py  # Basic functionality
-pytest tink_fields/test/test_coverage.py  # Edge cases
-```
-
-### Integration Test Harness
-
-This repo ships a minimal Django project under `example_project/` that exercises
-real model usage and verifies ciphertext at rest, tamper detection, deterministic
-lookups, and AAD behavior:
-
-```bash
-pytest -c example_project/pytest.ini example_project/example_app/tests
-```
-
-## 🛠️ Development
-
-### Setup Development Environment
-
-```bash
-# Clone the repository
-git clone https://github.com/script3r/django-tink-fields.git
-cd django-tink-fields
-
-# Create virtual environment
 python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+source .venv/bin/activate
+python -m pip install -e ".[dev,test]" build twine pip-audit bandit tox
 
-# Install development dependencies
-pip install -r requirements-dev.txt
-
-# Install package in development mode
-pip install -e .
-```
-
-### Code Quality
-
-The project uses modern Python tooling:
-
-```bash
-# Format code
-black tink_fields/
-isort tink_fields/
-
-# Lint code
-flake8 tink_fields/
-
-# Type checking
-mypy tink_fields/
-
-# Run all quality checks
+python -m pytest
+python -m pytest -c example_project/pytest.ini example_project/example_app/tests
+ruff check .
+ruff format --check .
+pyright --pythonpath "$(command -v python)"
 tox
 ```
 
-## 📊 Performance
+The release process is documented in [RELEASING.md](RELEASING.md). Changes are recorded in [CHANGELOG.md](CHANGELOG.md).
 
-### Benchmarks
+## License
 
-| Operation | Time (μs) | Memory (KB) |
-|-----------|-----------|-------------|
-| Encrypt 1KB | ~50 | ~2 |
-| Decrypt 1KB | ~45 | ~2 |
-| Field Creation | ~5 | ~1 |
-
-*Benchmarks on Python 3.13, Django 5.2, with AES128_GCM*
-
-### Optimization Tips
-
-1. **Use appropriate field types** - `CharField` for short text, `TextField` for long content
-2. **Cache keysets** - Keysets are automatically cached for performance
-3. **Minimize AAD complexity** - Keep AAD callbacks simple and fast
-4. **Batch operations** - Process multiple records together when possible
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Development Workflow
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Ensure all tests pass
-6. Submit a pull request
-
-## 📝 Changelog
-
-### v0.3.2 (Latest)
-- ✨ Modernized codebase with Python 3.10+ support
-- 🔧 Updated dependencies to latest versions
-- 📊 Improved test coverage to 97%+
-- 🎨 Applied modern Python formatting and linting
-- 📚 Enhanced documentation and examples
-
-### v0.2.0
-- 🐛 Fixed compatibility issues
-- 📦 Updated package structure
-
-## 📄 License
-
-This project is licensed under the BSD License - see the [LICENSE.txt](LICENSE.txt) file for details.
-
-## 🙏 Acknowledgments
-
-- [Google Tink](https://github.com/google/tink) - The cryptographic library powering this package
-- [Django Fernet Fields](https://github.com/orcasgit/django-fernet-fields) - Original inspiration for this project
-- [Django Community](https://www.djangoproject.com/community/) - For the amazing framework
-
-## 📞 Support
-
-- 📖 [Documentation](https://github.com/script3r/django-tink-fields#readme)
-- 🐛 [Issue Tracker](https://github.com/script3r/django-tink-fields/issues)
-- 💬 [Discussions](https://github.com/script3r/django-tink-fields/discussions)
-
----
-
-**Made with ❤️ for the Django community**
+BSD-3-Clause. See [LICENSE.txt](LICENSE.txt).

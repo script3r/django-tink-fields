@@ -7,11 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-01
+
 ### Added
-- Comprehensive contributing guidelines
-- Detailed development setup instructions
-- Performance benchmarks section
-- Security best practices guide
+
+- Exact and `isnull` query coverage for all deterministic field types.
+- `db_index` and `unique` support for deterministic encrypted fields.
+- Public `clear_keyset_cache()` API for adopting rotated keysets without restarting a process.
+- Python 3.14 and Django 5.2 compatibility, with a six-environment CI matrix covering Python 3.10 through 3.14 and Django 5.2/6.0.
+- Release, contribution, and security policies.
+
+### Changed
+
+- Keyset settings and files are now loaded lazily on first cryptographic operation, allowing model imports and migration serialization without access to production secrets.
+- Keyset handles use a bounded, thread-safe cache keyed by file metadata and the master AEAD instead of an unbounded identity-based cache.
+- Packaging now uses PEP 621/639 metadata, one version source, lean optional dependency groups, and excludes internal tests and test keysets from wheels.
+- Development tooling now uses Ruff formatting/linting and meaningful Pyright basic type checking.
+- Releases use PyPI trusted publishing and validate the version, distributions, and installed wheel before upload.
+
+### Fixed
+
+- Preserve custom `keyset` and `aad_callback` arguments in Django migrations and `Field.clone()`.
+- Prepare deterministic lookup values with the same backend-specific conversion used for writes, fixing UUID exact lookups on SQLite and other representation-sensitive backends.
+- Force ciphertext equality for deterministic Boolean lookups instead of Django's plaintext Boolean SQL shortcut.
+- Serialize encrypted JSON before backend-specific adapters wrap it, fixing invalid round trips on PostgreSQL.
+- Allow `field=None` to use `IS NULL` semantics on randomized encrypted fields.
+- Reject database expressions and database defaults instead of encrypting their string representation.
+- Report malformed keyset configuration and unreadable key material with actionable `ImproperlyConfigured` errors.
+
+### Removed
+
+- Redundant requirements files, legacy bumpversion configuration, and the release script that could publish from an unverified working tree.
 
 ## [0.3.2] - 2025-12-27
 
@@ -25,7 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - JSON field encryption now preserves structured payloads on round-trip
 - Improved README clarity around easy Django field encryption
 
-## [0.3.1] - 2025-12-27
+## [0.3.1] - 2025-09-14
 
 ### Added
 - Cached keyset handles to reduce repeated keyset file reads
@@ -39,7 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Retired legacy CHANGES.md in favor of this changelog
 
-## [0.3.0] - 2024-12-19
+## [0.3.0] - 2025-09-13
 
 ### Added
 - ✨ Modern Python 3.10+ support
@@ -70,7 +96,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🗑️ Cleaned up legacy code patterns
 - 🗑️ Removed unnecessary files and dependencies
 
-## [0.2.0] - 2023-XX-XX
+## [0.2.0] - 2022-05-28
 
 ### Added
 - Initial release with basic encrypted field support
@@ -86,7 +112,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Various bug fixes and improvements
 
-## [0.1.0] - 2023-XX-XX
+## [0.1.0] - 2022-05-22
 
 ### Added
 - Initial development release
@@ -97,6 +123,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 ## Migration Guide
+
+### Upgrading from 0.3.x to 0.4.0
+
+- Run `makemigrations --check`. Models using non-default `keyset` or `aad_callback` options may now produce a corrective `AlterField` migration because older releases omitted those options from migration state.
+- Existing ciphertext and keyset files remain compatible. Keep every old decryption key enabled when rotating a Tink keyset.
+- Randomized fields still reject indexes and uniqueness. Deterministic fields now accept them, but adding either requires a normal schema migration and explicit acceptance of deterministic encryption's equality leakage.
+- Configuration errors now occur on the first encrypt/decrypt operation rather than during model import.
+- Python 3.10/3.11 and Django 5.2 are supported again; Django 6.0 still requires Python 3.12 or newer.
 
 ### Upgrading from 0.2.x to 0.3.0
 
@@ -134,7 +168,7 @@ No breaking changes to configuration, but consider:
 
 ## Security Advisories
 
-### 2024-12-19
+### 2025-09-13
 - **Dependency Updates**: Updated all dependencies to latest secure versions
 - **Key Management**: Enhanced keyset validation and error handling
 - **Encryption**: No changes to encryption algorithms or security model
@@ -159,3 +193,11 @@ Thank you to all contributors who have helped improve Django Tink Fields!
 - [PyPI Package](https://pypi.org/project/django-tink-fields/)
 - [Documentation](https://github.com/script3r/django-tink-fields#readme)
 - [Issue Tracker](https://github.com/script3r/django-tink-fields/issues)
+
+[Unreleased]: https://github.com/script3r/django-tink-fields/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/script3r/django-tink-fields/compare/v0.3.2...v0.4.0
+[0.3.2]: https://github.com/script3r/django-tink-fields/compare/v0.3.1...v0.3.2
+[0.3.1]: https://github.com/script3r/django-tink-fields/compare/v0.2.0...v0.3.1
+[0.3.0]: https://github.com/script3r/django-tink-fields/compare/v0.2.0...b53e165
+[0.2.0]: https://github.com/script3r/django-tink-fields/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/script3r/django-tink-fields/releases/tag/v0.1.0

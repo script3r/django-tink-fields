@@ -5,18 +5,7 @@ This package provides encrypted Django model fields that use Google Tink
 for cryptographic operations, ensuring data confidentiality and integrity.
 """
 
-# Register Tink primitives
-from tink import aead
-
-# Try to import deterministic AEAD, fall back gracefully if not available
-try:
-    from tink import daead
-
-    DAEAD_AVAILABLE = True
-except ImportError:
-    DAEAD_AVAILABLE = False
-    daead = None
-
+from ._version import __version__
 from .fields import (
     DeterministicEncryptedBooleanField,
     DeterministicEncryptedCharField,
@@ -43,14 +32,11 @@ from .fields import (
     EncryptedTextField,
     EncryptedURLField,
     EncryptedUUIDField,
+    clear_keyset_cache,
 )
 
-aead.register()
-if DAEAD_AVAILABLE:
-    daead.register()
-
-__version__ = "0.3.2"
 __all__ = [
+    "__version__",
     "EncryptedField",
     "EncryptedTextField",
     "EncryptedCharField",
@@ -76,4 +62,5 @@ __all__ = [
     "DeterministicEncryptedBooleanField",
     "DeterministicEncryptedDateField",
     "DeterministicEncryptedDateTimeField",
+    "clear_keyset_cache",
 ]

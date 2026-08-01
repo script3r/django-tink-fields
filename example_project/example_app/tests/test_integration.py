@@ -2,10 +2,10 @@ from datetime import date, datetime
 from decimal import Decimal
 from uuid import uuid4
 
+import pytest
 from django.db import connection
 from django.utils.encoding import force_bytes
-
-import pytest
+from tink import TinkError
 
 from example_app import models
 
@@ -71,7 +71,7 @@ def test_tamper_detection():
     tampered[0] = (tampered[0] + 1) % 256
     _update_raw_bytes(models.EncryptedSample, "name", instance.id, bytes(tampered))
 
-    with pytest.raises(Exception):
+    with pytest.raises(TinkError):
         instance.refresh_from_db()
 
 
@@ -101,7 +101,7 @@ def test_aad_enforced():
     raw_secret = _fetch_raw_bytes(models.EncryptedWithAad, "secret", instance.id)
 
     field = models.EncryptedWithAad._meta.get_field("secret")
-    with pytest.raises(Exception):
+    with pytest.raises(TinkError):
         field._keyset_manager.aead_primitive.decrypt(raw_secret, b"wrong-aad")
 
 

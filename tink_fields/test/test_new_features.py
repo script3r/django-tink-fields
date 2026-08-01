@@ -2,11 +2,10 @@
 
 from unittest.mock import patch
 
-from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured
-from django.db import connection
-
 import pytest
+from django.conf import settings
+from django.core.exceptions import FieldError, ImproperlyConfigured
+from django.db import connection
 
 from tink_fields.fields import DAEAD_AVAILABLE, DeterministicEncryptedTextField
 
@@ -182,7 +181,7 @@ class TestDeterministicLookups:
         DeterministicEncryptedText.objects.create(value="value1")
 
         # Test that unsupported lookups raise FieldError
-        with pytest.raises(Exception):  # FieldError or similar
+        with pytest.raises(FieldError, match="does not support lookups"):
             DeterministicEncryptedText.objects.filter(value__contains="value").count()
 
 
@@ -195,14 +194,12 @@ class TestKeysetManager:
         from tink_fields.fields import KeysetManager
 
         # Test missing TINK_FIELDS_CONFIG
-        with patch.object(settings, "TINK_FIELDS_CONFIG", None):
-            with pytest.raises(ImproperlyConfigured):
-                KeysetManager("default", lambda x: b"")
+        with patch.object(settings, "TINK_FIELDS_CONFIG", None), pytest.raises(ImproperlyConfigured):
+            _ = KeysetManager("default").aead_primitive
 
         # Test missing keyset in config
-        with patch.object(settings, "TINK_FIELDS_CONFIG", {}):
-            with pytest.raises(ImproperlyConfigured):
-                KeysetManager("nonexistent", lambda x: b"")
+        with patch.object(settings, "TINK_FIELDS_CONFIG", {}), pytest.raises(ImproperlyConfigured):
+            _ = KeysetManager("nonexistent").aead_primitive
 
     def test_keyset_manager_caching(self):
         """Test that KeysetManager properly caches primitives."""
@@ -221,14 +218,10 @@ class TestKeysetManager:
         # Test deterministic primitive caching with deterministic keyset
         daead_manager = KeysetManager("deterministic", lambda x: b"")
 
-        if DAEAD_AVAILABLE:
-            daead1 = daead_manager.daead_primitive
-            daead2 = daead_manager.daead_primitive
-            assert daead1 is daead2
-        else:
-            # Should raise ImproperlyConfigured when not available
-            with pytest.raises(ImproperlyConfigured):
-                daead_manager.daead_primitive
+        assert DAEAD_AVAILABLE
+        daead1 = daead_manager.daead_primitive
+        daead2 = daead_manager.daead_primitive
+        assert daead1 is daead2
 
 
 @pytest.mark.django_db
@@ -260,4 +253,4 @@ class TestMemoryLeakFix:
         # Test deterministic primitive - should raise ImproperlyConfigured
         # because current keyset doesn't support deterministic AEAD
         with pytest.raises(ImproperlyConfigured):
-            manager.daead_primitive
+            _ = manager.daead_primitive
