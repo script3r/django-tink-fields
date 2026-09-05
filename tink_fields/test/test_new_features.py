@@ -1,4 +1,4 @@
-"""Tests for new features from PR #2 implementation."""
+"""Binary fields, deterministic lookups, and primitive reuse."""
 
 from unittest.mock import patch
 
@@ -229,7 +229,7 @@ class TestMemoryLeakFix:
     """Test cases for memory leak fixes."""
 
     def test_cached_property_usage(self):
-        """Test that cached_property is used instead of lru_cache."""
+        """Repeated validator access returns the cached validators."""
         field = DeterministicEncryptedTextField()
 
         # Get validators multiple times
@@ -240,7 +240,7 @@ class TestMemoryLeakFix:
         assert validators1 is validators2
 
     def test_keyset_manager_cached_properties(self):
-        """Test that KeysetManager uses cached_property correctly."""
+        """Repeated access reuses the primitive; incompatible types fail."""
         from tink_fields.fields import KeysetManager
 
         manager = KeysetManager("default", lambda x: b"")

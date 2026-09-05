@@ -29,7 +29,7 @@ from . import models
 
 
 def test_release_version() -> None:
-    assert __version__ == "0.4.0"
+    assert __version__ == "0.5.0"
 
 
 def test_fields_are_constructible_without_configured_keysets() -> None:

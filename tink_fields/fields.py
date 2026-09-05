@@ -89,7 +89,7 @@ class KeysetConfig:
 
     Attributes:
         path: Path to the keyset file
-        master_key_aead: Master key for encrypted keysets (optional)
+        master_key_aead: Tink Aead wrapping primitive, required for encrypted keysets
         cleartext: Whether the keyset is in cleartext format
     """
 
@@ -676,12 +676,10 @@ class EncryptedBinaryField(EncryptedField, models.BinaryField):
 class DeterministicEncryptedField(EncryptedField):
     """A field that uses Deterministic AEAD for searchable encryption.
 
-    Deterministic AEAD provides the same security guarantees as regular AEAD
-    but produces the same ciphertext for the same plaintext, making it
-    possible to search encrypted data.
-
-    Note: Deterministic encryption is less secure than regular AEAD as it
-    reveals patterns in the data. Use only when searchability is required.
+    Deterministic AEAD authenticates the payload and associated data while
+    revealing equality of prepared plaintext under the same key and AAD.
+    Exact lookups compare ciphertext, so changes to key generation, backend
+    representation, or AAD require an explicit data migration plan.
     """
 
     _unsupported_properties = frozenset(["primary_key", "db_default"])
