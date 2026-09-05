@@ -10,12 +10,12 @@ from __future__ import annotations
 import json
 from collections import OrderedDict
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from os import PathLike
 from pathlib import Path
 from threading import RLock
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar, TypeVar, cast
 from weakref import WeakSet
 
 from django.conf import settings
@@ -119,6 +119,15 @@ class KeysetConfig:
             raise ImproperlyConfigured("Encrypted keysets must specify `master_key_aead`.")
 
 
+Primitive = TypeVar("Primitive", aead.Aead, daead.DeterministicAead)
+
+
+@dataclass
+class _KeysetEntry:
+    handle: Any
+    primitives: dict[type[Any], Any] = field(default_factory=dict)
+
+
 class KeysetManager:
     """Manages Tink keyset handles and primitives.
 
@@ -128,7 +137,7 @@ class KeysetManager:
 
     _cache_size: ClassVar[int] = 32
     _cache_lock: ClassVar[RLock] = RLock()
-    _handle_cache: ClassVar[OrderedDict[tuple[Any, ...], Any]] = OrderedDict()
+    _handle_cache: ClassVar[OrderedDict[tuple[Any, ...], _KeysetEntry]] = OrderedDict()
     _managers: ClassVar[WeakSet[KeysetManager]] = WeakSet()
 
     def __init__(self, keyset_name: str, aad_callback: AADCallback = _default_aad_callback) -> None:
@@ -140,7 +149,7 @@ class KeysetManager:
         """
         self.keyset_name = keyset_name
         self.aad_callback = aad_callback
-        self._keyset_handle = None
+        self._entry: _KeysetEntry | None = None
 
         with self._cache_lock:
             self._managers.add(self)
@@ -183,84 +192,80 @@ class KeysetManager:
         with cls._cache_lock:
             cls._handle_cache.clear()
             for manager in list(cls._managers):
-                manager._keyset_handle = None
-                manager.__dict__.pop("aead_primitive", None)
-                manager.__dict__.pop("daead_primitive", None)
+                manager._entry = None
+
+    def _get_keyset_entry(self) -> _KeysetEntry:
+        """Load or reuse a keyset entry while holding the cache lock."""
+        if self._entry is not None:
+            return self._entry
+
+        keyset_config = self._get_keyset_config()
+        keyset_path = Path(keyset_config.path).expanduser().resolve()
+        try:
+            stat = keyset_path.stat()
+        except OSError as error:
+            raise ImproperlyConfigured(f"Could not load keyset `{self.keyset_name}`.") from error
+        cache_key = (
+            str(keyset_path),
+            stat.st_mtime_ns,
+            stat.st_size,
+            keyset_config.cleartext,
+            keyset_config.master_key_aead,
+        )
+        try:
+            hash(cache_key)
+        except TypeError:
+            cache_key = ()
+
+        cached_entry = self._handle_cache.get(cache_key) if cache_key else None
+        if cached_entry is not None:
+            self._handle_cache.move_to_end(cache_key)
+            self._entry = cached_entry
+        else:
+            try:
+                reader = JsonKeysetReader(keyset_path.read_text(encoding="utf-8"))
+                if keyset_config.cleartext:
+                    handle = cleartext_keyset_handle.read(reader)
+                else:
+                    master_key_aead = keyset_config.master_key_aead
+                    assert master_key_aead is not None
+                    handle = read_keyset_handle(reader, master_key_aead)
+            except (OSError, TinkError) as error:
+                raise ImproperlyConfigured(f"Could not load keyset `{self.keyset_name}`.") from error
+
+            self._entry = _KeysetEntry(handle)
+            if cache_key:
+                self._handle_cache[cache_key] = self._entry
+                self._handle_cache.move_to_end(cache_key)
+                while len(self._handle_cache) > self._cache_size:
+                    self._handle_cache.popitem(last=False)
+
+        return self._entry
 
     def _get_tink_keyset_handle(self) -> Any:
-        """Read the configuration for the requested keyset and return a keyset handle.
+        """Return this manager's configured handle."""
+        with self._cache_lock:
+            return self._get_keyset_entry().handle
 
-        Returns:
-            KeysetHandle: The configured Tink keyset handle
+    def _get_primitive(self, primitive_class: type[Primitive]) -> Primitive:
+        # Keep construction and publication atomic with respect to clear_cache().
+        # cached_property publishes after its getter returns, outside this lock.
+        with self._cache_lock:
+            entry = self._get_keyset_entry()
+            if primitive_class not in entry.primitives:
+                entry.primitives[primitive_class] = entry.handle.primitive(primitive_class)
+            return entry.primitives[primitive_class]
 
-        Raises:
-            ImproperlyConfigured: If keyset configuration is invalid or missing
-        """
-        if self._keyset_handle is None:
-            keyset_config = self._get_keyset_config()
-            keyset_path = Path(keyset_config.path).expanduser().resolve()
-            try:
-                stat = keyset_path.stat()
-            except OSError as error:
-                raise ImproperlyConfigured(f"Could not load keyset `{self.keyset_name}`.") from error
-            cache_key = (
-                str(keyset_path),
-                stat.st_mtime_ns,
-                stat.st_size,
-                keyset_config.cleartext,
-                keyset_config.master_key_aead,
-            )
-            try:
-                hash(cache_key)
-            except TypeError:
-                cache_key = ()
-
-            with self._cache_lock:
-                cached_handle = self._handle_cache.get(cache_key) if cache_key else None
-                if cached_handle is not None:
-                    self._handle_cache.move_to_end(cache_key)
-                    self._keyset_handle = cached_handle
-                else:
-                    try:
-                        reader = JsonKeysetReader(keyset_path.read_text(encoding="utf-8"))
-                        if keyset_config.cleartext:
-                            self._keyset_handle = cleartext_keyset_handle.read(reader)
-                        else:
-                            master_key_aead = keyset_config.master_key_aead
-                            assert master_key_aead is not None
-                            self._keyset_handle = read_keyset_handle(reader, master_key_aead)
-                    except (OSError, TinkError) as error:
-                        raise ImproperlyConfigured(f"Could not load keyset `{self.keyset_name}`.") from error
-
-                    if cache_key:
-                        self._handle_cache[cache_key] = self._keyset_handle
-                        self._handle_cache.move_to_end(cache_key)
-                        while len(self._handle_cache) > self._cache_size:
-                            self._handle_cache.popitem(last=False)
-
-        return self._keyset_handle
-
-    @cached_property
+    @property
     def aead_primitive(self) -> aead.Aead:
-        """Get the AEAD primitive for encryption/decryption operations.
+        """Get the AEAD primitive shared by managers using this keyset."""
+        return self._get_primitive(aead.Aead)
 
-        Returns:
-            aead.Aead: The AEAD primitive instance
-        """
-        return self._get_tink_keyset_handle().primitive(aead.Aead)
-
-    @cached_property
+    @property
     def daead_primitive(self) -> daead.DeterministicAead:
-        """Get the Deterministic AEAD primitive for encryption/decryption operations.
-
-        Returns:
-            daead.DeterministicAead: The Deterministic AEAD primitive instance
-
-        Raises:
-            ImproperlyConfigured: If deterministic AEAD is not available or keyset doesn't support it
-        """
+        """Get the deterministic AEAD primitive shared by this keyset."""
         try:
-            return self._get_tink_keyset_handle().primitive(daead.DeterministicAead)
+            return self._get_primitive(daead.DeterministicAead)
         except TinkError as error:
             raise ImproperlyConfigured(
                 "Current keyset does not support deterministic AEAD. "
