@@ -40,6 +40,12 @@ process must reload or restart after rotation.
 
 ## Landing and rollout
 
+**Current landing order:** [PR #13](https://github.com/script3r/django-tink-fields/pull/13)
+then [PR #12](https://github.com/script3r/django-tink-fields/pull/12). PR #7 is in
+`main`. PRs #8–#11 were merged into their predecessor branches, so PR #13 carries
+those four original commits into `main`. After #13 lands, change #12's base to
+`main` before merging it (or verify GitHub has retargeted it automatically).
+
 Land the PRs in dependency order. Each PR targets its predecessor so its diff
 contains only that change. After a parent lands, retarget the next PR to `main`
 if GitHub has not done so automatically. Merge commits preserve the stack's
