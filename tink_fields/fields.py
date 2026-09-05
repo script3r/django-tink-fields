@@ -20,6 +20,7 @@ from weakref import WeakSet
 from django.conf import settings
 from django.core.exceptions import FieldError, ImproperlyConfigured
 from django.db import models
+from django.db.models.lookups import Exact, IsNull, Lookup
 from django.utils.encoding import force_bytes, force_str
 from django.utils.functional import cached_property
 from tink import JsonKeysetReader, TinkError, aead, cleartext_keyset_handle, daead, read_keyset_handle
@@ -372,6 +373,18 @@ class EncryptedField(models.Field):
         """
         return self._internal_type
 
+    def get_lookup(self, lookup_name: str) -> type[Lookup]:
+        """Select only operations that are meaningful for ciphertext."""
+        if lookup_name == "isnull":
+            return IsNull
+        if lookup_name == "exact":
+            return EncryptedExact
+        raise FieldError(f"{self.__class__.__name__} `{lookup_name}` does not support lookups.")
+
+    def get_transform(self, lookup_name: str) -> None:
+        """Prevent inherited date and JSON transforms from inspecting ciphertext."""
+        raise FieldError(f"{self.__class__.__name__} `{lookup_name}` does not support lookups.")
+
     def get_db_prep_save(self, value: Any, connection: Any) -> Any:
         """Prepare the value for saving to the database.
 
@@ -447,55 +460,26 @@ class EncryptedField(models.Field):
         return f"<{self.__class__.__name__}: keyset={self._keyset}>"
 
 
-def _create_lookup_class(lookup_name: str, base_lookup_class: type[Any]) -> type[Any]:
-    """Create a lookup class that raises errors for encrypted fields.
-
-    Args:
-        lookup_name: Name of the lookup operation
-        base_lookup_class: Base lookup class to inherit from
-
-    Returns:
-        type: New lookup class that raises FieldError
-    """
+class EncryptedExact(Exact):
+    """Allow Django to rewrite equality with None to an IS NULL lookup."""
 
     def get_prep_lookup(self) -> Any:
-        """Raise error for unsupported lookups."""
-        if self.lookup_name == "exact" and self.rhs is None:
+        if self.rhs is None:
             return None
-        raise FieldError(f"{self.lhs.field.__class__.__name__} `{self.lookup_name}` does not support lookups.")
-
-    return type(
-        f"EncryptedField{lookup_name}",
-        (base_lookup_class,),
-        {"get_prep_lookup": get_prep_lookup},
-    )
+        field = self.lhs.output_field
+        raise FieldError(f"{field.__class__.__name__} `exact` does not support lookups.")
 
 
-def _create_deterministic_lookup_class(lookup_name: str, base_lookup_class: type[Any]) -> type[Any]:
-    """Create a lookup class for deterministic encrypted fields.
-
-    For deterministic fields, we support exact lookups by encrypting the
-    prepared value and comparing ciphertexts.
-
-    Args:
-        lookup_name: Name of the lookup operation
-        base_lookup_class: Base lookup class to inherit from
-
-    Returns:
-        type: New lookup class for deterministic fields
-    """
+class DeterministicEncryptedExact(Exact):
+    """Compare ciphertext prepared using the same conversion as writes."""
 
     def get_prep_lookup(self) -> Any:
-        """Handle lookups for deterministic encrypted fields."""
-        if self.lookup_name == "exact":
-            if hasattr(self.rhs, "resolve_expression"):
-                raise FieldError("Deterministic encrypted lookups do not support database expressions.")
-            return self.rhs
-        raise FieldError(f"{self.lhs.field.__class__.__name__} `{self.lookup_name}` does not support lookups.")
+        if hasattr(self.rhs, "resolve_expression"):
+            raise FieldError("Deterministic encrypted lookups do not support database expressions.")
+        return self.rhs
 
     def get_db_prep_lookup(self, value: Any, connection: Any) -> tuple[str, list[Any]]:
-        """Prepare and deterministically encrypt an exact lookup value."""
-        field = self.lhs.field
+        field = self.lhs.output_field
         prepared_value = field._prepare_value_for_database(value, connection)
         if prepared_value is None:
             return "%s", [None]
@@ -510,29 +494,6 @@ def _create_deterministic_lookup_class(lookup_name: str, base_lookup_class: type
         rhs_sql, rhs_params = self.process_rhs(compiler, connection)
         rhs_sql = self.get_rhs_op(connection, rhs_sql)
         return f"{lhs_sql} {rhs_sql}", (*lhs_params, *rhs_params)
-
-    return type(
-        f"DeterministicEncryptedField{lookup_name}",
-        (base_lookup_class,),
-        {
-            "get_prep_lookup": get_prep_lookup,
-            "get_db_prep_lookup": get_db_prep_lookup,
-            "as_sql": as_sql,
-        },
-    )
-
-
-def _register_lookup_classes():
-    """Register lookup classes for encrypted fields."""
-    for name, lookup in models.Field.class_lookups.items():
-        if name != "isnull":
-            # Register lookup class for regular encrypted fields
-            lookup_class = _create_lookup_class(name, lookup)
-            EncryptedField.register_lookup(lookup_class)
-
-            # Register lookup class for deterministic encrypted fields
-            deterministic_lookup_class = _create_deterministic_lookup_class(name, lookup)
-            DeterministicEncryptedField.register_lookup(deterministic_lookup_class)
 
 
 # Field implementations
@@ -671,6 +632,11 @@ class DeterministicEncryptedField(EncryptedField):
 
     _unsupported_properties = frozenset(["primary_key", "db_default"])
 
+    def get_lookup(self, lookup_name: str) -> type[Lookup]:
+        if lookup_name == "exact":
+            return DeterministicEncryptedExact
+        return super().get_lookup(lookup_name)
+
     def get_db_prep_save(self, value: Any, connection: Any) -> Any:
         """Prepare the value for saving to the database using deterministic encryption.
 
@@ -761,7 +727,3 @@ class DeterministicEncryptedDateTimeField(DeterministicEncryptedField, models.Da
     """Deterministic encrypted datetime field."""
 
     pass
-
-
-# Register lookup classes at module level
-_register_lookup_classes()
