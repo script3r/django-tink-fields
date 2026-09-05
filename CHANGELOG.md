@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Validate positional database options after Django resolves them. Randomized slug fields now default to `db_index=False`; existing applications should generate and apply the resulting index-removal migration.
+
 - Encrypt binary buffer contents before driver adaptation, fixing PostgreSQL writes that encrypted the string representation of a `psycopg.Binary` adapter. Previously corrupted values require application-specific recovery; this fix does not rewrite stored rows.
 
 - Synchronize primitive construction with cache invalidation so an in-flight load cannot republish a stale primitive after `clear_keyset_cache()`.

@@ -21,6 +21,7 @@ from weakref import WeakSet
 from django.conf import settings
 from django.core.exceptions import FieldError, ImproperlyConfigured
 from django.db import models
+from django.db.models.fields import NOT_PROVIDED
 from django.db.models.lookups import Exact, IsNull, Lookup
 from django.utils import timezone
 from django.utils.encoding import force_bytes, force_str
@@ -305,10 +306,11 @@ class EncryptedField(models.Field):
                 keyset: Name of the keyset to use (default: "default")
                 aad_callback: Callable for additional authenticated data
         """
-        # Validate unsupported properties
-        for prop in self._unsupported_properties:
-            if (prop == "db_default" and prop in kwargs) or kwargs.get(prop):
-                raise ImproperlyConfigured(f"Field `{self.__class__.__name__}` does not support property `{prop}`.")
+        # SlugField normally defaults to an index, which randomized ciphertext
+        # cannot use for meaningful equality queries.
+        if isinstance(self, models.SlugField) and "db_index" in self._unsupported_properties:
+            kwargs.setdefault("db_index", False)
+        has_db_default = "db_default" in kwargs
 
         # Extract custom parameters
         self._keyset = kwargs.pop("keyset", DEFAULT_KEYSET)
@@ -321,6 +323,18 @@ class EncryptedField(models.Field):
 
         # Call parent constructor first
         super().__init__(*args, **kwargs)
+
+        # Inspect resolved options so positional arguments and parent defaults
+        # receive the same checks as keyword arguments. Check primary_key before
+        # unique, since Django treats all primary keys as unique.
+        for prop in ("primary_key", "db_index", "unique", "db_default"):
+            if prop not in self._unsupported_properties:
+                continue
+            enabled = (
+                (has_db_default or self.db_default is not NOT_PROVIDED) if prop == "db_default" else getattr(self, prop)
+            )
+            if enabled:
+                raise ImproperlyConfigured(f"Field `{self.__class__.__name__}` does not support property `{prop}`.")
 
         self._keyset_manager = KeysetManager(self._keyset, self._aad_callback)
 
