@@ -167,6 +167,8 @@ from tink_fields import clear_keyset_cache
 clear_keyset_cache()
 ```
 
+Cache invalidation is synchronized with keyset loading and primitive construction. Operations that already obtained a primitive may finish with the old key; subsequent field operations load the replacement. The cache is local to each process, so reload or restart every worker.
+
 Changing `keyset=` does not re-encrypt existing rows; it only changes how future reads and writes are processed. Likewise, changing an existing plaintext Django field to an encrypted field requires an explicit staged data migration. Back up data and test recovery before any key or ciphertext migration.
 
 ## Security limitations
