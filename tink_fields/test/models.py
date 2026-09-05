@@ -95,3 +95,7 @@ class DeterministicEncryptedExtended(models.Model):
 
 class DeterministicEncryptedUnique(models.Model):
     value = fields.DeterministicEncryptedCharField(max_length=25, keyset="deterministic", unique=True)
+
+
+class DeterministicEncryptedDateTime(models.Model):
+    value = fields.DeterministicEncryptedDateTimeField(keyset="deterministic")

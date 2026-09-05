@@ -11,6 +11,7 @@ import json
 from collections import OrderedDict
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from os import PathLike
 from pathlib import Path
 from threading import RLock
@@ -21,6 +22,7 @@ from django.conf import settings
 from django.core.exceptions import FieldError, ImproperlyConfigured
 from django.db import models
 from django.db.models.lookups import Exact, IsNull, Lookup
+from django.utils import timezone
 from django.utils.encoding import force_bytes, force_str
 from django.utils.functional import cached_property
 from tink import JsonKeysetReader, TinkError, aead, cleartext_keyset_handle, daead, read_keyset_handle
@@ -428,8 +430,12 @@ class EncryptedField(models.Field):
         """
         if value is not None:
             decrypted = self._keyset_manager.aead_primitive.decrypt(bytes(value), self._get_aad())
-            return self.to_python(self._to_python_prepare(decrypted))
+            return self._convert_decrypted_value(decrypted, connection)
         return None
+
+    def _convert_decrypted_value(self, value: bytes, connection: Any) -> Any:
+        """Restore the Python value after decrypting a binary database value."""
+        return self.to_python(self._to_python_prepare(value))
 
     @cached_property
     def validators(self) -> list[Any]:
@@ -494,6 +500,14 @@ class DeterministicEncryptedExact(Exact):
         rhs_sql, rhs_params = self.process_rhs(compiler, connection)
         rhs_sql = self.get_rhs_op(connection, rhs_sql)
         return f"{lhs_sql} {rhs_sql}", (*lhs_params, *rhs_params)
+
+
+def _restore_datetime_timezone(value: datetime, connection: Any) -> datetime:
+    # Binary columns skip the backend's DateTimeField result converters.
+    # Use the database timezone that was used to prepare existing ciphertext.
+    if settings.USE_TZ and timezone.is_naive(value):
+        return timezone.make_aware(value, connection.timezone)
+    return value
 
 
 # Field implementations
@@ -595,7 +609,8 @@ class EncryptedDateField(EncryptedField, models.DateField):
 class EncryptedDateTimeField(EncryptedField, models.DateTimeField):
     """Encrypted datetime field."""
 
-    pass
+    def _convert_decrypted_value(self, value: bytes, connection: Any) -> datetime:
+        return _restore_datetime_timezone(super()._convert_decrypted_value(value, connection), connection)
 
 
 class EncryptedBinaryField(EncryptedField, models.BinaryField):
@@ -676,7 +691,7 @@ class DeterministicEncryptedField(EncryptedField):
         """
         if value is not None:
             decrypted = self._keyset_manager.daead_primitive.decrypt_deterministically(bytes(value), self._get_aad())
-            return self.to_python(self._to_python_prepare(decrypted))
+            return self._convert_decrypted_value(decrypted, connection)
         return None
 
 
@@ -726,4 +741,5 @@ class DeterministicEncryptedDateField(DeterministicEncryptedField, models.DateFi
 class DeterministicEncryptedDateTimeField(DeterministicEncryptedField, models.DateTimeField):
     """Deterministic encrypted datetime field."""
 
-    pass
+    def _convert_decrypted_value(self, value: bytes, connection: Any) -> datetime:
+        return _restore_datetime_timezone(super()._convert_decrypted_value(value, connection), connection)
