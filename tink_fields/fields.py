@@ -625,6 +625,13 @@ class EncryptedBinaryField(EncryptedField, models.BinaryField):
     not be converted to strings during decryption.
     """
 
+    def _prepare_value_for_database(self, value: Any, connection: Any) -> bytes | None:
+        """Keep buffer contents as plaintext; adapt only the final ciphertext."""
+        value = self.get_prep_value(value)
+        if value is None:
+            return None
+        return bytes(memoryview(value))
+
     def _to_python_prepare(self, value: bytes) -> bytes:
         """Prepare decrypted value for to_python conversion.
 
