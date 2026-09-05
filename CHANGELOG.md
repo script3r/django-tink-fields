@@ -7,7 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Load existing JSON keysets through Tink's explicit `json_proto_keyset_format` APIs, with typed handles and unchanged encrypted-keyset AAD.
+- Exercise all advertised Python/Django combinations and the minimum supported Tink 1.13.0 in CI and tox.
+
+- Share AEAD and deterministic AEAD primitives across fields using the same cached keyset, avoiding repeated wrapper construction while retaining bounded caching and weak manager tracking.
+
 ### Fixed
+
+- Expand user-relative keyset paths before validation and report invalid paths, non-UTF-8 keysets, invalid master primitives, and incompatible AEAD keysets as configuration errors.
+
+- Validate positional database options after Django resolves them. Randomized slug fields now default to `db_index=False`; existing applications should generate and apply the resulting index-removal migration.
+
+- Encrypt binary buffer contents before driver adaptation, fixing PostgreSQL writes that encrypted the string representation of a `psycopg.Binary` adapter. Previously corrupted values require application-specific recovery; this fix does not rewrite stored rows.
+
+- Synchronize primitive construction with cache invalidation so an in-flight load cannot republish a stale primitive after `clear_keyset_cache()`.
+
+- Restore the database timezone when decrypting naive datetime representations under `USE_TZ=True`, preserving instants across reads, re-saves, and deterministic lookups without rewriting stored ciphertext.
 
 - Reject inherited JSON/date transforms and late-registered plaintext lookups on encrypted columns; keep deterministic exact and SQL null lookups explicit.
 

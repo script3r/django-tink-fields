@@ -71,7 +71,7 @@ class Customer(models.Model):
     birth_date = EncryptedDateField(null=True)
 ```
 
-Values are ordinary Python objects on model instances. Django validates them using the corresponding built-in field's validators, encrypts them before database storage, and decrypts them when loading rows.
+Values are ordinary Python objects on model instances. The fields use the corresponding built-in field's validators, encrypt values before database storage, and decrypt them when loading rows. As with ordinary Django models, `save()` does not call `full_clean()` automatically; use a validated model form or call `full_clean()` explicitly when validation is required.
 
 ### Randomized fields
 
@@ -93,7 +93,7 @@ Values are ordinary Python objects on model instances. Django validates them usi
 | `EncryptedURLField` | `URLField` |
 | `EncryptedUUIDField` | `UUIDField` |
 
-Randomized fields deliberately reject `primary_key`, `unique`, `db_index`, and `db_default`. They support `isnull` queries, including the equivalent `field=None`; every lookup that compares values raises `FieldError`. Inherited JSON key lookups, date transforms, and custom registered lookups are also rejected because they would operate on ciphertext. Database expressions such as `F()` assignments are also rejected because the database cannot encrypt them.
+Randomized fields deliberately reject `primary_key`, `unique`, `db_index`, and `db_default`. They support `isnull` queries, including the equivalent `field=None`; every lookup that compares values raises `FieldError`. `EncryptedSlugField` defaults to `db_index=False`, unlike Django's plaintext slug field. Applications upgrading from an earlier version should run `makemigrations` and review the generated index-removal migration. Inherited JSON key lookups, date transforms, and custom registered lookups are also rejected because they would operate on ciphertext. Database expressions such as `F()` assignments are also rejected because the database cannot encrypt them.
 
 ### Deterministic fields and exact lookups
 
@@ -167,6 +167,10 @@ from tink_fields import clear_keyset_cache
 clear_keyset_cache()
 ```
 
+Cache invalidation is synchronized with keyset loading and primitive construction. Operations that already obtained a primitive may finish with the old key; subsequent field operations load the replacement. The cache is local to each process, so reload or restart every worker.
+
+For deterministic fields, promoting a new primary key changes the ciphertext used by exact lookups. Retaining old keys permits decryption but does not make new equality queries match rows encrypted under an old primary key, and a unique ciphertext index cannot enforce plaintext uniqueness across key generations. Plan a coordinated data migration before rotating deterministic keys; cache invalidation alone does not solve this.
+
 Changing `keyset=` does not re-encrypt existing rows; it only changes how future reads and writes are processed. Likewise, changing an existing plaintext Django field to an encrypted field requires an explicit staged data migration. Back up data and test recovery before any key or ciphertext migration.
 
 ## Security limitations
@@ -176,7 +180,7 @@ Changing `keyset=` does not re-encrypt existing rows; it only changes how future
 - Encryption does not hide row existence, nullness, ciphertext length, access patterns, or—when deterministic encryption is used—equality patterns.
 - Ordering encrypted columns is permitted by databases but orders ciphertext, not plaintext, and has no useful application meaning.
 - AAD authenticates context but is not secret and is not stored automatically.
-- Validation happens before storage but is not a substitute for authorization, logging controls, backups, or database security.
+- Field validation requires a model form or an explicit `full_clean()` call; encryption is not a substitute for application validation, authorization, logging controls, backups, or database security.
 
 See [SECURITY.md](SECURITY.md) for vulnerability reporting and supported releases.
 
