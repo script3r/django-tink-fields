@@ -26,7 +26,7 @@ from django.db.models.lookups import Exact, IsNull, Lookup
 from django.utils import timezone
 from django.utils.encoding import force_bytes, force_str
 from django.utils.functional import cached_property
-from tink import JsonKeysetReader, TinkError, aead, cleartext_keyset_handle, daead, read_keyset_handle
+from tink import KeysetHandle, TinkError, aead, daead, json_proto_keyset_format, secret_key_access
 
 
 def _register_tink_primitives() -> None:
@@ -110,14 +110,22 @@ class KeysetConfig:
         if not self.path:
             raise ImproperlyConfigured("Keyset path cannot be None or empty.")
 
-        if not Path(self.path).is_file():
+        try:
+            path = Path(self.path).expanduser().resolve()
+            readable_file = path.is_file()
+        except (OSError, RuntimeError, TypeError, ValueError) as error:
+            raise ImproperlyConfigured(f"Keyset `{self.path}` is not a readable file.") from error
+        if not readable_file:
             raise ImproperlyConfigured(f"Keyset `{self.path}` is not a readable file.")
+        object.__setattr__(self, "path", path)
 
         if not isinstance(self.cleartext, bool):
             raise ImproperlyConfigured("Keyset option `cleartext` must be a boolean.")
 
         if not self.cleartext and self.master_key_aead is None:
             raise ImproperlyConfigured("Encrypted keysets must specify `master_key_aead`.")
+        if not self.cleartext and not isinstance(self.master_key_aead, aead.Aead):
+            raise ImproperlyConfigured("`master_key_aead` must be a Tink Aead primitive.")
 
 
 Primitive = TypeVar("Primitive", aead.Aead, daead.DeterministicAead)
@@ -125,7 +133,7 @@ Primitive = TypeVar("Primitive", aead.Aead, daead.DeterministicAead)
 
 @dataclass
 class _KeysetEntry:
-    handle: Any
+    handle: KeysetHandle
     primitives: dict[type[Any], Any] = field(default_factory=dict)
 
 
@@ -201,7 +209,7 @@ class KeysetManager:
             return self._entry
 
         keyset_config = self._get_keyset_config()
-        keyset_path = Path(keyset_config.path).expanduser().resolve()
+        keyset_path = Path(keyset_config.path)
         try:
             stat = keyset_path.stat()
         except OSError as error:
@@ -224,14 +232,14 @@ class KeysetManager:
             self._entry = cached_entry
         else:
             try:
-                reader = JsonKeysetReader(keyset_path.read_text(encoding="utf-8"))
+                serialized_keyset = keyset_path.read_text(encoding="utf-8")
                 if keyset_config.cleartext:
-                    handle = cleartext_keyset_handle.read(reader)
+                    handle = json_proto_keyset_format.parse(serialized_keyset, secret_key_access.TOKEN)
                 else:
                     master_key_aead = keyset_config.master_key_aead
                     assert master_key_aead is not None
-                    handle = read_keyset_handle(reader, master_key_aead)
-            except (OSError, TinkError) as error:
+                    handle = json_proto_keyset_format.parse_encrypted(serialized_keyset, master_key_aead, b"")
+            except (OSError, UnicodeError, TinkError) as error:
                 raise ImproperlyConfigured(f"Could not load keyset `{self.keyset_name}`.") from error
 
             self._entry = _KeysetEntry(handle)
@@ -243,7 +251,7 @@ class KeysetManager:
 
         return self._entry
 
-    def _get_tink_keyset_handle(self) -> Any:
+    def _get_tink_keyset_handle(self) -> KeysetHandle:
         """Return this manager's configured handle."""
         with self._cache_lock:
             return self._get_keyset_entry().handle
@@ -260,7 +268,12 @@ class KeysetManager:
     @property
     def aead_primitive(self) -> aead.Aead:
         """Get the AEAD primitive shared by managers using this keyset."""
-        return self._get_primitive(aead.Aead)
+        try:
+            return self._get_primitive(aead.Aead)
+        except TinkError as error:
+            raise ImproperlyConfigured(
+                "Current keyset does not support AEAD. Please use a keyset that contains AEAD keys."
+            ) from error
 
     @property
     def daead_primitive(self) -> daead.DeterministicAead:
@@ -378,7 +391,7 @@ class EncryptedField(models.Field):
         return aad
 
     @property
-    def _keyset_handle(self) -> Any:
+    def _keyset_handle(self) -> KeysetHandle:
         """Get the keyset handle for backward compatibility.
 
         Returns:

@@ -9,9 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Load existing JSON keysets through Tink's explicit `json_proto_keyset_format` APIs, with typed handles and unchanged encrypted-keyset AAD.
+- Exercise all advertised Python/Django combinations and the minimum supported Tink 1.13.0 in CI and tox.
+
 - Share AEAD and deterministic AEAD primitives across fields using the same cached keyset, avoiding repeated wrapper construction while retaining bounded caching and weak manager tracking.
 
 ### Fixed
+
+- Expand user-relative keyset paths before validation and report invalid paths, non-UTF-8 keysets, invalid master primitives, and incompatible AEAD keysets as configuration errors.
 
 - Validate positional database options after Django resolves them. Randomized slug fields now default to `db_index=False`; existing applications should generate and apply the resulting index-removal migration.
 
