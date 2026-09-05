@@ -93,7 +93,7 @@ Values are ordinary Python objects on model instances. Django validates them usi
 | `EncryptedURLField` | `URLField` |
 | `EncryptedUUIDField` | `UUIDField` |
 
-Randomized fields deliberately reject `primary_key`, `unique`, `db_index`, and `db_default`. They support `isnull` queries, including the equivalent `field=None`; every lookup that compares values raises `FieldError`. Inherited JSON key lookups, date transforms, and custom registered lookups are also rejected because they would operate on ciphertext. Database expressions such as `F()` assignments are also rejected because the database cannot encrypt them.
+Randomized fields deliberately reject `primary_key`, `unique`, `db_index`, and `db_default`. They support `isnull` queries, including the equivalent `field=None`; every lookup that compares values raises `FieldError`. `EncryptedSlugField` defaults to `db_index=False`, unlike Django's plaintext slug field. Applications upgrading from an earlier version should run `makemigrations` and review the generated index-removal migration. Inherited JSON key lookups, date transforms, and custom registered lookups are also rejected because they would operate on ciphertext. Database expressions such as `F()` assignments are also rejected because the database cannot encrypt them.
 
 ### Deterministic fields and exact lookups
 
