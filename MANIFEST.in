@@ -5,4 +5,6 @@ include LICENSE.txt
 include README.md
 include RELEASING.md
 include SECURITY.md
+recursive-include docs *.md
+include example_project/README.md
 prune tink_fields/test

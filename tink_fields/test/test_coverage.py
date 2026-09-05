@@ -13,20 +13,20 @@ from . import models
 
 
 class TestKeysetConfigValidation:
-    """Test KeysetConfig validation methods for 100% coverage"""
+    """Test malformed keyset configuration."""
 
     def test_keyset_config_empty_path(self):
-        """Test KeysetConfig validation with empty path (line 38)"""
+        """Test KeysetConfig validation with empty path"""
         with pytest.raises(ImproperlyConfigured, match="Keyset path cannot be None or empty"):
             KeysetConfig(path="")
 
     def test_keyset_config_none_path(self):
-        """Test KeysetConfig validation with None path (line 38)"""
+        """Test KeysetConfig validation with None path"""
         with pytest.raises(ImproperlyConfigured, match="Keyset path cannot be None or empty"):
             KeysetConfig(path=None)
 
     def test_keyset_config_nonexistent_path(self):
-        """Test KeysetConfig validation with non-existent path (line 41)"""
+        """Test KeysetConfig validation with non-existent path"""
         with pytest.raises(ImproperlyConfigured, match="is not a readable file"):
             KeysetConfig(path="/nonexistent/path/that/does/not/exist.json")
 
@@ -48,7 +48,7 @@ class TestKeysetConfigValidation:
 
 
 class TestFieldPropertyValidation:
-    """Test field property validation for unsupported properties (line 60)"""
+    """Test field property validation for unsupported properties"""
 
     def test_primary_key_not_supported(self):
         """Test that primary_key property raises ImproperlyConfigured"""
@@ -70,10 +70,10 @@ class TestFieldPropertyValidation:
 
 
 class TestSettingsConfiguration:
-    """Test settings configuration validation (lines 73, 83)"""
+    """Test settings configuration validation"""
 
     def test_missing_tink_config(self):
-        """Test missing TINK_FIELDS_CONFIG in settings (line 73)"""
+        """Test missing TINK_FIELDS_CONFIG in settings"""
         with (
             patch.object(settings, "TINK_FIELDS_CONFIG", None),
             pytest.raises(
@@ -84,7 +84,7 @@ class TestSettingsConfiguration:
             EncryptedTextField()._get_aead_primitive()
 
     def test_missing_keyset_in_config(self):
-        """Test missing keyset in TINK_FIELDS_CONFIG (line 83)"""
+        """Test missing keyset in TINK_FIELDS_CONFIG"""
         with (
             patch.object(
                 settings,
@@ -100,7 +100,7 @@ class TestSettingsConfiguration:
 
 
 class TestCleartextKeysetHandling:
-    """Test cleartext keyset handling (line 94)"""
+    """Test cleartext keyset handling"""
 
     def test_cleartext_keyset_reading(self):
         """Test that cleartext keysets are read correctly"""
@@ -111,30 +111,30 @@ class TestCleartextKeysetHandling:
         assert field._keyset_handle is not None
 
     def test_cleartext_keyset_primitive_creation(self):
-        """Test that cleartext keyset creates the correct primitive (line 94)"""
+        """Test that cleartext keyset creates the correct primitive"""
         # Use the existing working cleartext keyset
         field = EncryptedTextField(keyset="default")
-        # This should trigger the cleartext_keyset_handle.read(reader) path
+        # Loading the fixture should produce a usable AEAD primitive.
         primitive = field._get_aead_primitive()
         assert primitive is not None
 
 
 class TestDatabaseValueHandling:
-    """Test database value handling for None values (lines 105, 113-114)"""
+    """Test database value handling for None values"""
 
     def test_get_internal_type(self):
-        """Test get_internal_type method (line 101)"""
+        """Test get_internal_type method"""
         field = EncryptedTextField()
         assert field.get_internal_type() == "BinaryField"
 
     def test_get_db_prep_save_with_none(self):
-        """Test get_db_prep_save with None value (line 105)"""
+        """Test get_db_prep_save with None value"""
         field = EncryptedTextField()
         result = field.get_db_prep_save(None, connection)
         assert result is None
 
     def test_from_db_value_with_none(self):
-        """Test from_db_value with None value (lines 113-114)"""
+        """Test from_db_value with None value"""
         field = EncryptedTextField()
         result = field.from_db_value(None, None, connection)
         assert result is None
@@ -149,7 +149,7 @@ class TestDatabaseValueHandling:
 
 
 class TestLookupErrors:
-    """Test unsupported lookup operations (line 139)"""
+    """Test unsupported lookup operations"""
 
     def test_exact_lookup_raises_error(self):
         """Test that exact lookup raises FieldError"""

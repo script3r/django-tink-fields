@@ -1,12 +1,12 @@
-# Code review and landing plan — 2026-09-05
+# Code review — 2026-09-05
 
 Reviewed the library, tests, example project, packaging, and CI from `main` at
 `72c1661`. The original suite passed 76 library tests with 95.28% coverage, but
-missed several value-conversion and ORM restriction failures. This stack adds
+missed several value-conversion and ORM restriction failures. The reviewed changes add
 behavioral regressions instead of treating coverage percentage as proof of
 correctness.
 
-## Changes in this stack
+## Changes included in 0.5.0
 
 | Priority | Finding and evidence | Resolution |
 | --- | --- | --- |
@@ -16,9 +16,9 @@ correctness.
 | Medium | One hundred fields sharing a keyset constructed 100 separate primitives. | PR #9: share one primitive per type per cached keyset, retaining bounded caching and weak manager references. |
 | High | PostgreSQL binary writes encrypted the string representation of `psycopg.Binary`, corrupting the original contents. Four real-driver cases failed. | [PR #10](https://github.com/script3r/django-tink-fields/pull/10): convert buffer contents before encryption, and adapt only final ciphertext. |
 | Medium | Positional database options bypassed validation; randomized slug fields silently inherited an index. | [PR #11](https://github.com/script3r/django-tink-fields/pull/11): validate resolved options and serialize `db_index=False` for encrypted slugs. |
-| Medium | User-relative keyset paths were checked before expansion; invalid encodings and incompatible AEAD primitives escaped as low-level exceptions. | Final keyset-loading PR: normalize paths and improve configuration errors. |
-| Medium | CI omitted two advertised Python/Django combinations and never pinned the minimum Tink version. | Final PR: add Python 3.13/3.14 with Django 5.2 and a Tink 1.13.0 job; keep tox aligned. |
-| Low | Keyset loading used the older reader/handle API and untyped handles. | Final PR: use Tink's explicit JSON format API and `KeysetHandle` annotations, with legacy keyset interoperability coverage. |
+| Medium | User-relative keyset paths were checked before expansion; invalid encodings and incompatible AEAD primitives escaped as low-level exceptions. | [PR #12](https://github.com/script3r/django-tink-fields/pull/12): normalize paths and improve configuration errors. |
+| Medium | CI omitted two advertised Python/Django combinations and never pinned the minimum Tink version. | PR #12: add Python 3.13/3.14 with Django 5.2 and a Tink 1.13.0 job; keep tox aligned. |
+| Low | Keyset loading used the older reader/handle API and untyped handles. | PR #12: use Tink's explicit JSON format API and `KeysetHandle` annotations, with legacy keyset interoperability coverage. |
 
 ## Performance evidence
 
@@ -38,29 +38,19 @@ or performance under contention. Encryption itself occurs outside the cache
 lock. Calls that obtained an old primitive can finish with it, and every worker
 process must reload or restart after rotation.
 
-## Landing and rollout
+## Release status and rollout
 
-**Current landing order:** [PR #13](https://github.com/script3r/django-tink-fields/pull/13)
-then [PR #12](https://github.com/script3r/django-tink-fields/pull/12). PR #7 is in
-`main`. PRs #8–#11 were merged into their predecessor branches, so PR #13 carries
-those four original commits into `main`. After #13 lands, change #12's base to
-`main` before merging it (or verify GitHub has retargeted it automatically).
+All reviewed changes reached `main` in merge commit `cc51950` through PR #13,
+including the modernization changes from PR #12. There is no remaining landing
+order for this original stack. They are included in the 0.5.0 release preparation.
 
-Land the PRs in dependency order. Each PR targets its predecessor so its diff
-contains only that change. After a parent lands, retarget the next PR to `main`
-if GitHub has not done so automatically. Merge commits preserve the stack's
-ancestry; squash or rebase merges require rebasing the remaining branches onto
-the new `main` before landing them.
-
-- Existing correctly serialized ciphertext remains readable. No key or payload
-  format migration is introduced by the lookup, timezone, cache, or loading PRs.
-- For encrypted slug fields, generate and apply the index-removal migration.
-  Positional configurations that violate documented restrictions now fail early.
-- PostgreSQL binary rows already corrupted by adapter stringification require
-  application-specific recovery. In particular, a stored memoryview description
-  does not contain the original bytes and cannot be repaired by this patch.
-- The final README corrects the validation claim: Django model `save()` does not
-  automatically call `full_clean()`.
+The [upgrade guide](upgrading-to-0.5.md) is the current rollout reference. The
+subsequent documentation audit confirmed that an old omitted slug index default
+can produce **no autodetected migration** under the new field class; inspect the
+physical index and use a reviewed database-specific migration when necessary.
+Previously corrupted binary data or shifted datetimes cannot be repaired by
+upgrading alone. See [operations](operations.md) for validation and rotation
+limits.
 
 ## Follow-up priorities and limits
 
@@ -93,15 +83,15 @@ the new `main` before landing them.
    validators without changing shared metadata and retain backend range checks.
 
 5. **Low — improve typing and test organization incrementally.** The older
-   coverage-focused tests contain duplicate assertions and stale line-number
-   comments. Consolidate them around observable behavior while retaining the
+   coverage-focused tests contain duplicate assertions. Stale line-number and
+   cache implementation comments were corrected during release preparation. Consolidate tests around observable behavior while retaining the
    new regression cases. Package a `py.typed` marker only after testing the
    public Django field annotations with downstream type checkers. Module splits
    should preserve public field import paths used in existing migrations.
 
 ## Validation
 
-At the top of the stack, all **137 library tests** and **6 example integration
+At completion of the reviewed implementation, all **137 library tests** and **6 example integration
 tests** pass locally on both Python 3.14 / Django 6.0 / Tink 1.16.1 and Python
 3.10 / Django 5.2 / Tink 1.13.0. Library coverage is **97.62%**. Ruff lint/format
 and Pyright pass. Distribution builds and strict Twine validation pass; the

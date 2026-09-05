@@ -7,26 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- Load existing JSON keysets through Tink's explicit `json_proto_keyset_format` APIs, with typed handles and unchanged encrypted-keyset AAD.
-- Exercise all advertised Python/Django combinations and the minimum supported Tink 1.13.0 in CI and tox.
-
-- Share AEAD and deterministic AEAD primitives across fields using the same cached keyset, avoiding repeated wrapper construction while retaining bounded caching and weak manager tracking.
+## [0.5.0] - 2026-09-05
 
 ### Fixed
 
-- Expand user-relative keyset paths before validation and report invalid paths, non-UTF-8 keysets, invalid master primitives, and incompatible AEAD keysets as configuration errors.
+- Reject inherited JSON/date transforms and late-registered plaintext lookups on encrypted columns; preserve deterministic exact and SQL null lookups.
+- Restore the database timezone when decrypting naive datetime representations under `USE_TZ=True`, preventing new read/re-save shifts without changing ciphertext serialization.
+- Encrypt binary buffer contents before driver adaptation, fixing PostgreSQL writes that encrypted the string representation of a `psycopg.Binary` adapter.
+- Synchronize primitive construction/publication with `clear_keyset_cache()` so an in-flight load cannot republish a stale primitive after invalidation returns.
+- Validate resolved positional and keyword database options; default randomized slug fields to `db_index=False`.
+- Expand user-relative keyset paths before validation and report invalid paths, non-UTF-8 files, invalid master primitives, and incompatible AEAD keysets as configuration errors.
 
-- Validate positional database options after Django resolves them. Randomized slug fields now default to `db_index=False`; existing applications should generate and apply the resulting index-removal migration.
+### Changed
 
-- Encrypt binary buffer contents before driver adaptation, fixing PostgreSQL writes that encrypted the string representation of a `psycopg.Binary` adapter. Previously corrupted values require application-specific recovery; this fix does not rewrite stored rows.
+- Share AEAD/DAEAD primitives across fields using the same cached keyset, reducing repeated construction while retaining weak manager tracking and a bounded shared lookup cache.
+- Load existing JSON keysets with Tink's `json_proto_keyset_format` APIs and typed handles, retaining empty encrypted-keyset AAD.
+- Document explicit model validation, actual backend test coverage, deterministic representation/rotation limits, and historical data recovery. Add operations, upgrade, and example-project guides.
 
-- Synchronize primitive construction with cache invalidation so an in-flight load cannot republish a stale primitive after `clear_keyset_cache()`.
+### Added
 
-- Restore the database timezone when decrypting naive datetime representations under `USE_TZ=True`, preserving instants across reads, re-saves, and deterministic lookups without rewriting stored ciphertext.
+- Coverage for all eight advertised Python/Django combinations and a separate Tink 1.13.0 environment in CI and tox. Runtime dependency bounds are unchanged.
+- Behavioral regression tests for lookups, timezone round trips, psycopg adaptation, field options, concurrent invalidation, rotation, and configuration errors; 137 library and 6 example tests at release preparation.
+- A reproducible cache benchmark showing reduced initialization work and the small warm-call cost of synchronization.
 
-- Reject inherited JSON/date transforms and late-registered plaintext lookups on encrypted columns; keep deterministic exact and SQL null lookups explicit.
+### Upgrade notes
+
+- Inspect existing encrypted slug indexes. Historical migrations may omit the former default, so `makemigrations` can report no changes while an old index remains; a reviewed database-specific removal migration may be needed.
+- Already-corrupted PostgreSQL binary values and previously shifted datetimes require application-specific recovery. Correctly stored ciphertext remains readable; this release does not rewrite data automatically.
+- Configurations and queries that relied on validation/lookup bypasses now fail early. Deterministic key rotation still requires a coordinated migration for equality and plaintext uniqueness.
+- Read the [0.5.0 upgrade guide](docs/upgrading-to-0.5.md) before deployment.
 
 ## [0.4.0] - 2026-08-01
 
@@ -145,11 +154,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Migration Guide
 
+### Upgrading to 0.5.0
+
+See the [0.5.0 upgrade guide](docs/upgrading-to-0.5.md) for required index inspection, stricter field/query restrictions, and historical data recovery limits.
+
 ### Upgrading from 0.3.x to 0.4.0
 
 - Run `makemigrations --check`. Models using non-default `keyset` or `aad_callback` options may now produce a corrective `AlterField` migration because older releases omitted those options from migration state.
-- Existing ciphertext and keyset files remain compatible. Keep every old decryption key enabled when rotating a Tink keyset.
-- Randomized fields still reject indexes and uniqueness. Deterministic fields now accept them, but adding either requires a normal schema migration and explicit acceptance of deterministic encryption's equality leakage.
+- Existing ciphertext and keyset files remain compatible. Keeping old keys enabled preserves decryption during rotation, but deterministic exact lookups and plaintext uniqueness do not automatically span key generations; see the [operations guide](docs/operations.md#rotation-and-data-migration).
+- Randomized field definitions are intended to reject indexes and uniqueness, but 0.4.0 still has positional-argument and implicit slug-index bypasses fixed in 0.5.0. Deterministic fields accept indexes and uniqueness, subject to schema migration and equality-leakage tradeoffs.
 - Configuration errors now occur on the first encrypt/decrypt operation rather than during model import.
 - Python 3.10/3.11 and Django 5.2 are supported again; Django 6.0 still requires Python 3.12 or newer.
 
@@ -190,7 +203,7 @@ No breaking changes to configuration, but consider:
 ## Security Advisories
 
 ### 2025-09-13
-- **Dependency Updates**: Updated all dependencies to latest secure versions
+- **Dependency Updates**: Dependency versions were updated; this historical entry is not a guarantee that those versions remain vulnerability-free.
 - **Key Management**: Enhanced keyset validation and error handling
 - **Encryption**: No changes to encryption algorithms or security model
 
@@ -215,7 +228,8 @@ Thank you to all contributors who have helped improve Django Tink Fields!
 - [Documentation](https://github.com/script3r/django-tink-fields#readme)
 - [Issue Tracker](https://github.com/script3r/django-tink-fields/issues)
 
-[Unreleased]: https://github.com/script3r/django-tink-fields/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/script3r/django-tink-fields/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/script3r/django-tink-fields/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/script3r/django-tink-fields/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/script3r/django-tink-fields/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/script3r/django-tink-fields/compare/v0.2.0...v0.3.1
