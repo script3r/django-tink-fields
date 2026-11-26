@@ -20,6 +20,7 @@ from typing import Any, ClassVar, TypeVar, cast
 from weakref import WeakSet
 
 from django.conf import settings
+from django.core import checks
 from django.core.exceptions import FieldError, ImproperlyConfigured
 from django.db import models
 from django.db.models.fields import NOT_PROVIDED
@@ -434,9 +435,7 @@ class EncryptedField(models.Field):
             raise FieldError(f"{self.__class__.__name__} does not support database expressions.")
         val = self._prepare_value_for_database(value, connection)
         if val is not None:
-            return connection.Database.Binary(
-                self._keyset_manager.aead_primitive.encrypt(force_bytes(val), self._get_aad())
-            )
+            return connection.Database.Binary(self._encrypt(force_bytes(val)))
         return None
 
     def _prepare_value_for_database(self, value: Any, connection: Any) -> Any:
@@ -466,9 +465,15 @@ class EncryptedField(models.Field):
             Decrypted and converted Python object, or None if value is None
         """
         if value is not None:
-            decrypted = self._keyset_manager.aead_primitive.decrypt(bytes(value), self._get_aad())
+            decrypted = self._decrypt(bytes(value))
             return self._convert_decrypted_value(decrypted, connection)
         return None
+
+    def _encrypt(self, value: bytes) -> bytes:
+        return self._keyset_manager.aead_primitive.encrypt(value, self._get_aad())
+
+    def _decrypt(self, value: bytes) -> bytes:
+        return self._keyset_manager.aead_primitive.decrypt(value, self._get_aad())
 
     def _convert_decrypted_value(self, value: bytes, connection: Any) -> Any:
         """Restore the Python value after decrypting a binary database value."""
@@ -512,14 +517,7 @@ class DeterministicEncryptedExact(Exact):
         return self.rhs
 
     def get_db_prep_lookup(self, value: Any, connection: Any) -> tuple[str, list[Any]]:
-        field = self.lhs.output_field
-        prepared_value = field._prepare_value_for_database(value, connection)
-        if prepared_value is None:
-            return "%s", [None]
-        encrypted_value = field._keyset_manager.daead_primitive.encrypt_deterministically(
-            force_bytes(prepared_value), field._get_aad()
-        )
-        return "%s", [connection.Database.Binary(encrypted_value)]
+        return "%s", [self.lhs.output_field.get_db_prep_save(value, connection)]
 
     def as_sql(self, compiler: Any, connection: Any) -> tuple[str, tuple[Any, ...]]:
         """Render equality without Django's plaintext Boolean shortcut."""
@@ -601,18 +599,16 @@ class EncryptedJSONField(EncryptedField, models.JSONField):
             return None
         return json.dumps(value, cls=self.encoder)
 
-    def from_db_value(
-        self,
-        value: Any,
-        expression: Any,
-        connection: Any,
-        *args: Any,
-    ) -> Any:
-        """Convert database value to Python object with JSON decoding."""
-        if value is not None:
-            decrypted = self._keyset_manager.aead_primitive.decrypt(bytes(value), self._get_aad())
-            return models.JSONField.from_db_value(self, force_str(decrypted), expression, connection)
-        return None
+    def _check_supported(self, databases: Sequence[str]) -> list[checks.Error]:
+        # JSON is encoded in Python and stored in a binary column.
+        return []
+
+    def _convert_decrypted_value(self, value: bytes, connection: Any) -> Any:
+        text = force_str(value)
+        try:
+            return json.loads(text, cls=self.decoder)
+        except json.JSONDecodeError:
+            return text
 
 
 class EncryptedURLField(EncryptedField, models.URLField):
@@ -684,47 +680,11 @@ class DeterministicEncryptedField(EncryptedField):
             return DeterministicEncryptedExact
         return super().get_lookup(lookup_name)
 
-    def get_db_prep_save(self, value: Any, connection: Any) -> Any:
-        """Prepare the value for saving to the database using deterministic encryption.
+    def _encrypt(self, value: bytes) -> bytes:
+        return self._keyset_manager.daead_primitive.encrypt_deterministically(value, self._get_aad())
 
-        Args:
-            value: The value to be saved
-            connection: Database connection
-
-        Returns:
-            Binary object containing deterministically encrypted data, or None if value is None
-        """
-        if hasattr(value, "resolve_expression"):
-            raise FieldError(f"{self.__class__.__name__} does not support database expressions.")
-        val = self._prepare_value_for_database(value, connection)
-        if val is not None:
-            return connection.Database.Binary(
-                self._keyset_manager.daead_primitive.encrypt_deterministically(force_bytes(val), self._get_aad())
-            )
-        return None
-
-    def from_db_value(
-        self,
-        value: Any,
-        expression: Any,
-        connection: Any,
-        *args: Any,
-    ) -> Any:
-        """Convert database value to Python object using deterministic decryption.
-
-        Args:
-            value: Raw value from database
-            expression: Database expression
-            connection: Database connection
-            *args: Additional arguments
-
-        Returns:
-            Decrypted and converted Python object, or None if value is None
-        """
-        if value is not None:
-            decrypted = self._keyset_manager.daead_primitive.decrypt_deterministically(bytes(value), self._get_aad())
-            return self._convert_decrypted_value(decrypted, connection)
-        return None
+    def _decrypt(self, value: bytes) -> bytes:
+        return self._keyset_manager.daead_primitive.decrypt_deterministically(value, self._get_aad())
 
 
 # Deterministic field implementations
