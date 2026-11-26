@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-26
+
 ### Added
 
 - Django 6.1 support on Python 3.12, 3.13 and 3.14. The runtime dependency is now `Django>=5.2,<6.2`. CI and tox cover the three new Python/Django combinations.
@@ -16,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Convert encrypted integers before PostgreSQL driver adaptation and keep the binary column type stable while Django builds integer validators.
 - Allow encrypted JSON fields in Django's system checks when a database lacks native JSON support.
+
+### Changed
+
+- Share encrypted field conversion between randomized and deterministic fields. Deterministic exact lookups use the same preparation as writes.
 
 ## [0.5.0] - 2026-09-05
 
@@ -238,7 +244,8 @@ Thank you to all contributors who have helped improve Django Tink Fields!
 - [Documentation](https://github.com/script3r/django-tink-fields#readme)
 - [Issue Tracker](https://github.com/script3r/django-tink-fields/issues)
 
-[Unreleased]: https://github.com/script3r/django-tink-fields/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/script3r/django-tink-fields/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/script3r/django-tink-fields/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/script3r/django-tink-fields/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/script3r/django-tink-fields/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/script3r/django-tink-fields/compare/v0.3.1...v0.3.2
