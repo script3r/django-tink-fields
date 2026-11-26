@@ -19,9 +19,9 @@ Runtime dependencies are `Django>=5.2,<6.2` and `tink>=1.13,<2`. CI covers all e
 
 CI runs the full library test suite against SQLite and PostgreSQL 17 with psycopg. Encrypted columns use Django's `BinaryField` database type. Backend-dependent serialization affects some values and deterministic equality. See the [operations guide](https://github.com/script3r/django-tink-fields/blob/main/docs/operations.md).
 
-## Upgrading to 0.5.0
+## Upgrading from 0.4.x or earlier
 
-Read the [upgrade guide](https://github.com/script3r/django-tink-fields/blob/main/docs/upgrading-to-0.5.md) before deploying. Check existing slug indexes even if `makemigrations` reports no changes, review rejected field/query configurations, and assess PostgreSQL binary values or datetimes already corrupted by earlier writes. This release prevents new failures; it cannot reconstruct lost or previously shifted data automatically.
+Review encrypted slug indexes, field and query compatibility, and recovery options for PostgreSQL binary values or datetimes affected by earlier writes. These checks apply when moving from 0.4.x or earlier to the 0.5 series. See the [0.5.0 upgrade guide](https://github.com/script3r/django-tink-fields/blob/main/docs/upgrading-to-0.5.md).
 
 ## Installation
 
