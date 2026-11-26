@@ -14,7 +14,7 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev,test]" build twine pip-audit bandit tox
 ```
 
-Python 3.10/3.11 use Django 5.2; Python 3.12–3.14 support Django 5.2 and 6.0.
+Python 3.10/3.11 use Django 5.2; Python 3.12–3.14 support Django 5.2, 6.0 and 6.1.
 The test extra installs psycopg for driver-adaptation tests, but no PostgreSQL
 server is needed. Tests and fixture keysets are excluded from release packages;
 run the suite from a checkout, not an unpacked wheel or source distribution.
@@ -33,10 +33,10 @@ python -m build --outdir /tmp/django-tink-fields-build
 twine check --strict /tmp/django-tink-fields-build/*
 ```
 
-Use a fresh output directory for each package validation. Run `tox` for the eight
+Use a fresh output directory for each package validation. Run `tox` for the eleven
 supported Python/Django combinations and the additional Python 3.10 / Django 5.2
 / Tink 1.13.0 environment. Install all five interpreters for a complete local
-matrix. CI runs the same nine test environments plus a quality job.
+matrix. CI runs the same twelve test environments plus a quality job.
 
 Bug fixes should include a regression that fails before the fix. Changes to
 persistence, lookups, AAD, or migration serialization should verify Python values
