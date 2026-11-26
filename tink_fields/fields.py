@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from collections import OrderedDict
 from collections.abc import Callable, Mapping, Sequence
+from copy import copy
 from dataclasses import dataclass, field
 from datetime import datetime
 from os import PathLike
@@ -440,6 +441,10 @@ class EncryptedField(models.Field):
 
     def _prepare_value_for_database(self, value: Any, connection: Any) -> Any:
         """Apply the concrete Django field's database preparation semantics."""
+        if isinstance(self, models.IntegerField):
+            # The driver binds ciphertext as binary, so the plaintext integer
+            # needs Django's Python conversion without the integer SQL adapter.
+            return self.get_prep_value(value)
         return super().get_db_prep_save(value, connection)
 
     def from_db_value(
@@ -471,23 +476,13 @@ class EncryptedField(models.Field):
 
     @cached_property
     def validators(self) -> list[Any]:
-        """Get field validators.
-
-        Temporarily modifies the internal type to get appropriate validators
-        from the parent field class.
-
-        Returns:
-            list: List of validators for the field
-        """
-        # Temporarily pretend to be whatever type of field we're masquerading
-        # as, for purposes of constructing validators (needed for
-        # IntegerField and subclasses).
-        original_internal_type = self._internal_type
-        self.__dict__["_internal_type"] = super().get_internal_type()
-        try:
+        """Use Django's integer range validators without changing the model field."""
+        if not isinstance(self, models.IntegerField):
             return super().validators
-        finally:
-            self.__dict__["_internal_type"] = original_internal_type
+
+        validation_field = copy(self)
+        validation_field._internal_type = super().get_internal_type()
+        return super(EncryptedField, validation_field).validators
 
     def __repr__(self) -> str:
         """Return string representation of the field.
