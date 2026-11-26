@@ -59,9 +59,10 @@ def test_existing_datetime_ciphertext_remains_readable(field_cls, plaintext):
     assert result == datetime(2026, 9, 5, 3, 4, 5, 123456, tzinfo=ZoneInfo("UTC"))
 
 
-@pytest.mark.parametrize("field_cls", [EncryptedDateTimeField, DeterministicEncryptedDateTimeField])
+@pytest.mark.django_db
+@pytest.mark.parametrize("model", [models.EncryptedDateTime, models.DeterministicEncryptedDateTime])
 @pytest.mark.parametrize("value", [None, datetime(2026, 9, 5, 12, 34, 56)])
 @override_settings(USE_TZ=False)
-def test_naive_datetime_and_null_round_trip(field_cls, value):
-    field = field_cls(keyset="deterministic" if field_cls is DeterministicEncryptedDateTimeField else "default")
-    assert field.from_db_value(field.get_db_prep_save(value, connection), None, connection) == value
+def test_naive_datetime_and_null_round_trip(model, value):
+    instance = model.objects.create(value=value)
+    assert model.objects.values_list("value", flat=True).get(pk=instance.pk) == value

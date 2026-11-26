@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Django 6.1 support on Python 3.12, 3.13 and 3.14. The runtime dependency is now `Django>=5.2,<6.2`. CI and tox cover the three new Python/Django combinations.
+- Run the full library suite against PostgreSQL 17 on Django 5.2, 6.0, and 6.1.
 
 ### Fixed
 
