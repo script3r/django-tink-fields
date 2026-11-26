@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Convert encrypted integers before PostgreSQL driver adaptation and keep the binary column type stable while Django builds integer validators.
+- Allow encrypted JSON fields in Django's system checks when a database lacks native JSON support.
 
 ## [0.5.0] - 2026-09-05
 
