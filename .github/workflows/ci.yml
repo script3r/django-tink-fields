@@ -63,6 +63,47 @@ jobs:
           PYTHONWARNINGS: default
         run: python -m pytest -c example_project/pytest.ini example_project/example_app/tests
 
+  postgresql:
+    name: PostgreSQL 17 / Django ${{ matrix.django }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        django: ["5.2", "6.0", "6.1"]
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: tink_fields
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d tink_fields"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install test environment
+        run: python -m pip install -e ".[test]" "Django~=${{ matrix.django }}.0"
+
+      - name: Run library tests against PostgreSQL
+        env:
+          PYTHONWARNINGS: default
+          PGHOST: localhost
+          PGPORT: ${{ job.services.postgres.ports[5432] }}
+          PGPASSWORD: postgres
+        run: python -m pytest --ds=tink_fields.test.settings.postgresql
+
   minimum-tink:
     name: Python 3.10 / Django 5.2 / Tink 1.13.0
     runs-on: ubuntu-latest

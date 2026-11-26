@@ -17,7 +17,7 @@ Encrypted Django model fields backed by [Google Tink](https://developers.google.
 
 Runtime dependencies are `Django>=5.2,<6.2` and `tink>=1.13,<2`. CI covers all eleven Python/Django combinations above and separately tests Tink 1.13.0.
 
-SQLite has full ORM integration coverage. PostgreSQL tests use the real psycopg driver adapter without a server; PostgreSQL, MySQL, and Oracle server compatibility is not established by this suite. Encrypted columns use Django's `BinaryField` database type, but backend-dependent serialization still affects some values and deterministic equality. See the [operations guide](https://github.com/script3r/django-tink-fields/blob/main/docs/operations.md).
+CI runs the full library test suite against SQLite and PostgreSQL 17 with psycopg. Encrypted columns use Django's `BinaryField` database type. Backend-dependent serialization affects some values and deterministic equality. See the [operations guide](https://github.com/script3r/django-tink-fields/blob/main/docs/operations.md).
 
 ## Upgrading to 0.5.0
 

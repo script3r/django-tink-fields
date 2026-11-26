@@ -3,10 +3,13 @@
 import pytest
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
-from django.db import connection, models
+from django.db import connection
+from django.db import models as django_models
 from django.db.backends.postgresql.base import DatabaseWrapper
 
 from tink_fields import DeterministicEncryptedIntegerField, EncryptedIntegerField, EncryptedPositiveIntegerField
+
+from . import models
 
 
 @pytest.mark.parametrize(
@@ -29,9 +32,9 @@ def test_postgresql_integer_preparation(field, value):
 @pytest.mark.parametrize(
     "field_class, django_field_class",
     [
-        (EncryptedIntegerField, models.IntegerField),
-        (EncryptedPositiveIntegerField, models.PositiveIntegerField),
-        (DeterministicEncryptedIntegerField, models.IntegerField),
+        (EncryptedIntegerField, django_models.IntegerField),
+        (EncryptedPositiveIntegerField, django_models.PositiveIntegerField),
+        (DeterministicEncryptedIntegerField, django_models.IntegerField),
     ],
 )
 def test_integer_validators_preserve_binary_type_and_django_bounds(field_class, django_field_class):
@@ -56,3 +59,15 @@ def test_integer_validators_preserve_binary_type_and_django_bounds(field_class, 
     with pytest.raises(ValidationError) as too_large:
         field.clean(upper + 1, None)
     assert too_large.value.error_list[0].code == "max_value"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("model", [models.EncryptedInt, models.DeterministicEncryptedInteger])
+def test_integer_bulk_create_and_literal_update(model):
+    first, second = model.objects.bulk_create([model(value=-12), model(value=0)])
+    assert list(model.objects.order_by("pk").values_list("value", flat=True)) == [-12, 0]
+
+    assert model.objects.filter(pk=second.pk).update(value=24) == 1
+    assert list(model.objects.order_by("pk").values_list("value", flat=True)) == [-12, 24]
+    first.refresh_from_db()
+    assert first.value == -12

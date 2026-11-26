@@ -65,10 +65,16 @@ Deterministic equality compares serialized bytes, not a plaintext database
 collation or a normalized application identity. PostgreSQL datetime offsets and
 backend-specific UUID representations are known examples where equivalent
 application values can serialize differently. Changing backend, connection
-timezone, normalization, keyset, or AAD may require a data migration. Full server
-integration is currently tested only with SQLite; psycopg coverage exercises
-actual driver adaptation without a PostgreSQL server. MySQL and Oracle server
-behavior is not established by the suite.
+timezone, normalization, keyset, or AAD may require a data migration. CI runs
+the library suite on SQLite and PostgreSQL 17 with psycopg. MySQL and Oracle
+server behavior is outside that coverage.
+
+With SQLite and a database timezone that observes daylight saving time, the two
+occurrences of a repeated local time serialize to the same local datetime text.
+A read can restore the wrong instant, and deterministic lookups treat both
+occurrences as equal. Use a UTC database connection for encrypted datetime
+fields in new deployments. Review existing ciphertext before changing the
+connection timezone.
 
 ## Cache behavior and performance
 

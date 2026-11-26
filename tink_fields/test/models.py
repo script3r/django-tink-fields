@@ -28,7 +28,7 @@ class EncryptedDate(models.Model):
 
 
 class EncryptedDateTime(models.Model):
-    value = fields.EncryptedDateTimeField()
+    value = fields.EncryptedDateTimeField(null=True)
 
 
 class EncryptedNullable(models.Model):
@@ -98,4 +98,4 @@ class DeterministicEncryptedUnique(models.Model):
 
 
 class DeterministicEncryptedDateTime(models.Model):
-    value = fields.DeterministicEncryptedDateTimeField(keyset="deterministic")
+    value = fields.DeterministicEncryptedDateTimeField(null=True, keyset="deterministic")

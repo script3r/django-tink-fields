@@ -15,9 +15,9 @@ python -m pip install -e ".[dev,test]" build twine pip-audit bandit tox
 ```
 
 Python 3.10/3.11 use Django 5.2; Python 3.12–3.14 support Django 5.2, 6.0 and 6.1.
-The test extra installs psycopg for driver-adaptation tests, but no PostgreSQL
-server is needed. Tests and fixture keysets are excluded from release packages;
-run the suite from a checkout, not an unpacked wheel or source distribution.
+The test extra installs psycopg. The default suite runs on SQLite and includes
+standalone psycopg adapter tests. Run the suite from a checkout so Django can
+load the test models and fixture keysets.
 
 ## Checks
 
@@ -36,7 +36,17 @@ twine check --strict /tmp/django-tink-fields-build/*
 Use a fresh output directory for each package validation. Run `tox` for the eleven
 supported Python/Django combinations and the additional Python 3.10 / Django 5.2
 / Tink 1.13.0 environment. Install all five interpreters for a complete local
-matrix. CI runs the same twelve test environments plus a quality job.
+matrix. CI runs the same twelve test environments, a quality job, and the
+library suite on PostgreSQL 17 for all three supported Django versions.
+
+To run the PostgreSQL suite locally, use a development PostgreSQL instance and
+a user with permission to create a test database. Settings read `PGHOST`,
+`PGPORT`, `PGDATABASE`, `PGUSER`, and `PGPASSWORD`. The example below uses
+`localhost:5432`, database `tink_fields`, and user `postgres` by default.
+
+```bash
+python -m pytest --ds=tink_fields.test.settings.postgresql
+```
 
 Bug fixes should include a regression that fails before the fix. Changes to
 persistence, lookups, AAD, or migration serialization should verify Python values
