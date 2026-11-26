@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Django 6.1 support on Python 3.12, 3.13 and 3.14. The runtime dependency is now `Django>=5.2,<6.2`. CI and tox cover the three new Python/Django combinations.
 
+### Fixed
+
+- Convert encrypted integers before PostgreSQL driver adaptation and keep the binary column type stable while Django builds integer validators.
+
 ## [0.5.0] - 2026-09-05
 
 ### Fixed
